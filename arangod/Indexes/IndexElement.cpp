@@ -22,74 +22,153 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "IndexElement.h"
+#include "Basics/VelocyPackHelper.h"
 #include "Indexes/IndexLookupContext.h"
 
 using namespace arangodb;
 
-IndexElement::IndexElement(TRI_voc_rid_t revisionId, size_t numSubs) 
-    : _revisionId(revisionId) {
-    
-  for (size_t i = 0; i < numSubs; ++i) {
-    subObject(i)->fill(arangodb::velocypack::Slice::noneSlice());
+HashIndexElement::HashIndexElement(TRI_voc_rid_t revisionId, std::vector<std::pair<VPackSlice, uint32_t>> const& values) 
+    : _revisionId(revisionId), _hash(hash(values)) {
+   
+  for (size_t i = 0; i < values.size(); ++i) {
+    subObject(i)->fill(values[i].first, values[i].second);
   }
 }
 
-/// @brief allocate a new index element
-IndexElement* IndexElement::create(TRI_voc_rid_t revisionId, std::vector<arangodb::velocypack::Slice> const& values) {
+HashIndexElement* HashIndexElement::create(TRI_voc_rid_t revisionId, std::vector<std::pair<arangodb::velocypack::Slice, uint32_t>> const& values) {
   TRI_ASSERT(!values.empty());
-
-  IndexElement* element = create(revisionId, values.size());
-
-  if (element == nullptr) {
-    return nullptr;
-  }
-
-  try {
-    for (size_t i = 0; i < values.size(); ++i) {
-      element->subObject(i)->fill(values[i]);
-    }
-    return element;
-  } catch (...) {
-    element->free(values.size());
-    return nullptr;
-  }
-}
-
-/// @brief allocate a new index element from a slice
-IndexElement* IndexElement::create(TRI_voc_rid_t revisionId, arangodb::velocypack::Slice const& value) {
-  IndexElement* element = create(revisionId, 1);
-  
-  if (element == nullptr) {
-    return nullptr;
-  }
-
-  try {
-    element->subObject(0)->fill(value);
-    return element;
-  } catch (...) {
-    element->free(1);
-    return nullptr;
-  }
-}
-
-IndexElement* IndexElement::create(TRI_voc_rid_t revisionId, size_t numSubs) {
-  void* space = TRI_Allocate(TRI_UNKNOWN_MEM_ZONE, baseMemoryUsage(numSubs), false);
+  void* space = TRI_Allocate(TRI_UNKNOWN_MEM_ZONE, baseMemoryUsage(values.size()), false);
 
   if (space == nullptr) {
     return nullptr;
   }
 
-  // will not fail
-  return new (space) IndexElement(revisionId, numSubs);
+  try {
+    return new (space) HashIndexElement(revisionId, values);
+  } catch (...) {
+    TRI_Free(TRI_UNKNOWN_MEM_ZONE, space);
+    return nullptr;
+  }
 }
 
-void IndexElement::free(size_t numSubs) {
-  for (size_t i = 0; i < numSubs; ++i) {
-    subObject(i)->free();
-  }
+void HashIndexElement::free() {
   TRI_Free(TRI_UNKNOWN_MEM_ZONE, this);
 }
+  
+/// @brief velocypack sub-object (for indexes, as part of IndexElement, 
+/// if offset is non-zero, then it is an offset into the VelocyPack data in
+/// the datafile or WAL file. If offset is 0, then data contains the actual data
+/// in place.
+arangodb::velocypack::Slice HashIndexElement::slice(IndexLookupContext* context, size_t position) const {
+  IndexElementValue const* sub = subObject(position);
+  
+  if (sub->isInline()) {
+    return arangodb::velocypack::Slice(&sub->value.data[0]);
+  }
+  
+  uint32_t offset = sub->value.offset;
+  if (offset == 0) {
+    return basics::VelocyPackHelper::NullValue();
+  } 
+  uint8_t const* vpack = context->lookup(_revisionId);
+  if (vpack == nullptr) {
+    THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_DOCUMENT_NOT_FOUND);
+  } 
+  return VPackSlice(vpack + sub->value.offset);
+}
+
+uint64_t HashIndexElement::hash(arangodb::velocypack::Slice const& values) {
+  uint64_t hash = 0x0123456789abcdef;
+  size_t const n = values.length();
+ 
+  for (size_t i = 0; i < n; ++i) {
+    // must use normalized hash here, to normalize different representations 
+    // of arrays/objects/numbers
+    hash = values.at(i).normalizedHash(hash);
+  }
+  
+  return hash & 0x00000000FFFFFFFFULL;
+}
+
+uint64_t HashIndexElement::hash(std::vector<arangodb::velocypack::Slice> const& values) {
+  uint64_t hash = 0x0123456789abcdef;
+  size_t const n = values.size();
+ 
+  for (size_t i = 0; i < n; ++i) {
+    // must use normalized hash here, to normalize different representations 
+    // of arrays/objects/numbers
+    hash = values[i].normalizedHash(hash);
+  }
+  
+  return hash & 0x00000000FFFFFFFFULL;
+}
+
+uint64_t HashIndexElement::hash(std::vector<std::pair<arangodb::velocypack::Slice, uint32_t>> const& values) {
+  uint64_t hash = 0x0123456789abcdef;
+  size_t const n = values.size();
+ 
+  for (size_t i = 0; i < n; ++i) {
+    // must use normalized hash here, to normalize different representations 
+    // of arrays/objects/numbers
+    hash = values[i].first.normalizedHash(hash);
+  }
+  
+  return hash & 0x00000000FFFFFFFFULL;
+}
+
+
+
+SkiplistIndexElement::SkiplistIndexElement(TRI_voc_rid_t revisionId, std::vector<std::pair<VPackSlice, uint32_t>> const& values) 
+    : _revisionId(revisionId) {
    
+  for (size_t i = 0; i < values.size(); ++i) {
+    subObject(i)->fill(values[i].first, values[i].second);
+  }
+}
+
+SkiplistIndexElement* SkiplistIndexElement::create(TRI_voc_rid_t revisionId, std::vector<std::pair<arangodb::velocypack::Slice, uint32_t>> const& values) {
+  TRI_ASSERT(!values.empty());
+  void* space = TRI_Allocate(TRI_UNKNOWN_MEM_ZONE, baseMemoryUsage(values.size()), false);
+
+  if (space == nullptr) {
+    return nullptr;
+  }
+
+  try {
+    return new (space) SkiplistIndexElement(revisionId, values);
+  } catch (...) {
+    TRI_Free(TRI_UNKNOWN_MEM_ZONE, space);
+    return nullptr;
+  }
+}
+
+void SkiplistIndexElement::free() {
+  TRI_Free(TRI_UNKNOWN_MEM_ZONE, this);
+}
+  
+/// @brief velocypack sub-object (for indexes, as part of IndexElement, 
+/// if offset is non-zero, then it is an offset into the VelocyPack data in
+/// the datafile or WAL file. If offset is 0, then data contains the actual data
+/// in place.
+arangodb::velocypack::Slice SkiplistIndexElement::slice(IndexLookupContext* context, size_t position) const {
+  IndexElementValue const* sub = subObject(position);
+  
+  if (sub->isInline()) {
+    return arangodb::velocypack::Slice(&sub->value.data[0]);
+  }
+  
+  uint32_t offset = sub->value.offset;
+  if (offset == 0) {
+    return basics::VelocyPackHelper::NullValue();
+  } 
+  uint8_t const* vpack = context->lookup(_revisionId);
+  if (vpack == nullptr) {
+    THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_DOCUMENT_NOT_FOUND);
+  } 
+  return VPackSlice(vpack + sub->value.offset);
+}
+
+
 SimpleIndexElement::SimpleIndexElement(TRI_voc_rid_t revisionId, arangodb::velocypack::Slice const& value, uint32_t offset)
     : _revisionId(revisionId), _hashAndOffset(hash(value) | (static_cast<uint64_t>(offset) << 32)) {} 
   

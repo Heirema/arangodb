@@ -27,6 +27,7 @@
 #include "Basics/AttributeNameParser.h"
 #include "Basics/StaticStrings.h"
 #include "Basics/VelocyPackHelper.h"
+#include "Indexes/IndexLookupContext.h"
 #include "Indexes/PrimaryIndex.h"
 #include "Indexes/RocksDBFeature.h"
 #include "Indexes/RocksDBKeyComparator.h"
@@ -253,7 +254,7 @@ void RocksDBIndex::toVelocyPackFigures(VPackBuilder& builder) const {
 int RocksDBIndex::insert(arangodb::Transaction* trx, TRI_voc_rid_t revisionId,
                          VPackSlice const& doc, bool isRollback) {
   auto comparator = RocksDBFeature::instance()->comparator();
-  std::vector<IndexElement*> elements;
+  std::vector<SkiplistIndexElement*> elements;
 
   int res;
   try {
@@ -265,7 +266,7 @@ int RocksDBIndex::insert(arangodb::Transaction* trx, TRI_voc_rid_t revisionId,
   // make sure we clean up before we leave this method
   auto cleanup = [this, &elements] {
     for (auto& it : elements) {
-      it->free(numPaths());
+      it->free();
     }
   };
 
@@ -275,6 +276,7 @@ int RocksDBIndex::insert(arangodb::Transaction* trx, TRI_voc_rid_t revisionId,
     return res;
   }
   
+  IndexLookupContext context(trx, _collection, numPaths()); 
   VPackSlice const key = Transaction::extractKeyFromDocument(doc);
   std::string const prefix =
       buildPrefix(trx->vocbase()->id(), _collection->cid(), _iid);
@@ -293,7 +295,7 @@ int RocksDBIndex::insert(arangodb::Transaction* trx, TRI_voc_rid_t revisionId,
     builder.clear();
     builder.openArray();
     for (size_t i = 0; i < _fields.size(); ++i) {
-      builder.add(it->slice(i));
+      builder.add(it->slice(&context, i));
     }
     builder.add(key); // always append _key value to the end of the array
     builder.close();
@@ -309,7 +311,7 @@ int RocksDBIndex::insert(arangodb::Transaction* trx, TRI_voc_rid_t revisionId,
       builder.clear();
       builder.openArray();
       for (size_t i = 0; i < _fields.size(); ++i) {
-        builder.add(it->slice(i));
+        builder.add(it->slice(&context, i));
       }
       builder.add(VPackSlice::minKeySlice());
       builder.close();
@@ -326,7 +328,7 @@ int RocksDBIndex::insert(arangodb::Transaction* trx, TRI_voc_rid_t revisionId,
       builder.clear();
       builder.openArray();
       for (size_t i = 0; i < _fields.size(); ++i) {
-        builder.add(it->slice(i));
+        builder.add(it->slice(&context, i));
       }
       builder.add(VPackSlice::maxKeySlice());
       builder.close();
@@ -410,7 +412,7 @@ int RocksDBIndex::insert(arangodb::Transaction* trx, TRI_voc_rid_t revisionId,
 
 int RocksDBIndex::remove(arangodb::Transaction* trx, TRI_voc_rid_t revisionId,
                          VPackSlice const& doc, bool isRollback) {
-  std::vector<IndexElement*> elements;
+  std::vector<SkiplistIndexElement*> elements;
 
   int res;
   try {
@@ -422,7 +424,7 @@ int RocksDBIndex::remove(arangodb::Transaction* trx, TRI_voc_rid_t revisionId,
   // make sure we clean up before we leave this method
   auto cleanup = [this, &elements] {
     for (auto& it : elements) {
-      it->free(numPaths());
+      it->free();
     }
   };
 
@@ -432,6 +434,7 @@ int RocksDBIndex::remove(arangodb::Transaction* trx, TRI_voc_rid_t revisionId,
     return res;
   }
   
+  IndexLookupContext context(trx, _collection, numPaths()); 
   VPackSlice const key = Transaction::extractKeyFromDocument(doc);
   
   VPackBuilder builder;
@@ -440,7 +443,7 @@ int RocksDBIndex::remove(arangodb::Transaction* trx, TRI_voc_rid_t revisionId,
     builder.clear();
     builder.openArray();
     for (size_t i = 0; i < _fields.size(); ++i) {
-      builder.add(it->slice(i));
+      builder.add(it->slice(&context, i));
     }
     builder.add(key); // always append _key value to the end of the array
     builder.close();

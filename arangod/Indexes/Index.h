@@ -296,9 +296,6 @@ class Index {
   virtual void expandInSearchValues(arangodb::velocypack::Slice const,
                                     arangodb::velocypack::Builder&) const;
 
- protected:
-  IndexElement* buildStringElement(TRI_voc_rid_t, arangodb::velocypack::Slice const& doc) const;
-
  private:
   /// @brief set fields from slice
   void setFields(VPackSlice const& slice, bool allowExpansion);

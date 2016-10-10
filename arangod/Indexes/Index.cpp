@@ -818,12 +818,6 @@ void Index::expandInSearchValues(VPackSlice const base,
   }
 }
 
-IndexElement* Index::buildStringElement(TRI_voc_rid_t revisionId, VPackSlice const& doc) const {
-  TRI_ASSERT(doc.isString());
-  
-  return IndexElement::create(revisionId, doc);
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief append the index description to an output stream
 ////////////////////////////////////////////////////////////////////////////////

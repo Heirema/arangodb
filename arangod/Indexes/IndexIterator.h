@@ -45,7 +45,10 @@ class IndexIterator {
   IndexIterator() = delete;
 
   IndexIterator(LogicalCollection* collection, arangodb::Transaction* trx)
-      : _collection(collection), _trx(trx) {}
+      : _collection(collection), _trx(trx) {
+    TRI_ASSERT(_collection != nullptr);
+    TRI_ASSERT(_trx != nullptr);
+  }
 
   virtual ~IndexIterator();
 

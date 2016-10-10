@@ -41,8 +41,6 @@
 
 using namespace arangodb;
 
-static constexpr uint64_t hashSeed = 0x87654321;
-   
 /// @brief hard-coded vector of the index attributes
 /// note that the attribute names must be hard-coded here to avoid an init-order
 /// fiasco with StaticStrings::FromString etc.
@@ -136,14 +134,14 @@ IndexLookupResult EdgeIndexIterator::next() {
       if (tmp.isObject()) {
         tmp = tmp.get(StaticStrings::IndexEq);
       }
-      IndexLookupContext context(_trx, _collection); 
+      IndexLookupContext context(_trx, _collection, 1); 
       _index->lookupByKey(&context, &tmp, _buffer, _batchSize);
     } else if (_posInBuffer >= _buffer.size()) {
       // We have to refill the buffer
       _buffer.clear();
 
       _posInBuffer = 0;
-      IndexLookupContext context(_trx, _collection); 
+      IndexLookupContext context(_trx, _collection, 1); 
       _index->lookupByKeyContinue(&context, _lastElement, _buffer, _batchSize);
     }
     
@@ -179,14 +177,14 @@ void EdgeIndexIterator::nextBabies(std::vector<IndexLookupResult>& buffer, size_
       if (tmp.isObject()) {
         tmp = tmp.get(StaticStrings::IndexEq);
       }
-      IndexLookupContext context(_trx, _collection); 
+      IndexLookupContext context(_trx, _collection, 1); 
       _index->lookupByKey(&context, &tmp, _buffer, atMost);
       // fallthrough intentional
     } else {
       // Continue the lookup
       buffer.clear();
 
-      IndexLookupContext context(_trx, _collection); 
+      IndexLookupContext context(_trx, _collection, 1); 
       _index->lookupByKeyContinue(&context, _lastElement, _buffer, atMost);
     }
 
@@ -463,7 +461,7 @@ int EdgeIndex::insert(arangodb::Transaction* trx, TRI_voc_rid_t revisionId,
   SimpleIndexElement fromElement(buildFromElement(revisionId, doc));
   SimpleIndexElement toElement(buildToElement(revisionId, doc));
 
-  IndexLookupContext context(trx, _collection); 
+  IndexLookupContext context(trx, _collection, 1); 
   _edgesFrom->insert(&context, fromElement, true, isRollback);
 
   try {
@@ -482,7 +480,7 @@ int EdgeIndex::remove(arangodb::Transaction* trx, TRI_voc_rid_t revisionId,
   SimpleIndexElement fromElement(buildFromElement(revisionId, doc));
   SimpleIndexElement toElement(buildToElement(revisionId, doc));
   
-  IndexLookupContext context(trx, _collection); 
+  IndexLookupContext context(trx, _collection, 1); 
  
   try { 
     _edgesFrom->remove(&context, fromElement);
@@ -502,25 +500,14 @@ int EdgeIndex::batchInsert(arangodb::Transaction* trx,
   if (documents.empty()) {
     return TRI_ERROR_NO_ERROR;
   }
-/* TODO
-  // TODO: OOM 
-  std::vector<IndexElement*> elements;
+
+  std::vector<SimpleIndexElement> elements;
   elements.reserve(documents.size());
 
-  auto cleanup = [&elements]() {
-    for (auto& it : elements) { it->free(1); }
-  };
-
-  // clean up the vector of elements when we leave
-  TRI_DEFER(cleanup());
-  
+  // _from
   for (auto const& it : documents) {
-    IndexElementGuard fromElement(buildFromElement(it.first, it.second), 1);
-    if (fromElement == nullptr) {
-      return TRI_ERROR_OUT_OF_MEMORY;
-    }
-    elements.emplace_back(fromElement.get());
-    fromElement.release();
+    VPackSlice value(Transaction::extractFromFromDocument(it.second));
+    elements.emplace_back(SimpleIndexElement(it.first, value, static_cast<uint32_t>(value.begin() - it.second.begin())));
   }
 
   int res = _edgesFrom->batchInsert(trx, &elements, numThreads);
@@ -528,18 +515,12 @@ int EdgeIndex::batchInsert(arangodb::Transaction* trx,
   if (res != TRI_ERROR_NO_ERROR) {
     return res;
   }
-  // ownership for _from elements is now in index
-  // prevent cleaning up of what we just inserted
+
+  // _to
   elements.clear();
-  
   for (auto const& it : documents) {
-    IndexElementGuard toElement(buildToElement(it.first, it.second), 1);
-    if (toElement == nullptr) {
-      // TODO: remove the elements that were inserted into _edgesFrom!
-      return TRI_ERROR_OUT_OF_MEMORY;
-    }
-    elements.emplace_back(toElement.get());
-    toElement.release();
+    VPackSlice value(Transaction::extractToFromDocument(it.second));
+    elements.emplace_back(SimpleIndexElement(it.first, value, static_cast<uint32_t>(value.begin() - it.second.begin())));
   }
 
   res = _edgesTo->batchInsert(trx, &elements, numThreads);
@@ -547,10 +528,7 @@ int EdgeIndex::batchInsert(arangodb::Transaction* trx,
   if (res != TRI_ERROR_NO_ERROR) {
     return res;
   }
-  // ownership for _to elements is now in index
-  // prevent cleaning up of what we just inserted
-  elements.clear();
-*/
+  
   return TRI_ERROR_NO_ERROR;
 }
 
@@ -573,7 +551,7 @@ int EdgeIndex::sizeHint(arangodb::Transaction* trx, size_t size) {
 
   // set an initial size for the index for some new nodes to be created
   // without resizing
-  IndexLookupContext context(trx, _collection); 
+  IndexLookupContext context(trx, _collection, 1); 
   int err = _edgesFrom->resize(&context, static_cast<uint32_t>(size + 2049));
 
   if (err != TRI_ERROR_NO_ERROR) {

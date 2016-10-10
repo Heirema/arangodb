@@ -54,7 +54,6 @@ class DatafileStatisticsContainer;
 class Ditches;
 class FollowerInfo;
 class Index;
-struct IndexElement;
 class KeyGenerator;
 class ManagedDocumentResult;
 class ManagedMultiDocumentResult;

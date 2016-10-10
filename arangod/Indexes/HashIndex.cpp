@@ -27,6 +27,7 @@
 #include "Aql/SortCondition.h"
 #include "Basics/Exceptions.h"
 #include "Basics/VelocyPackHelper.h"
+#include "Indexes/IndexLookupContext.h"
 #include "Indexes/SimpleAttributeEqualityMatcher.h"
 #include "Utils/TransactionContext.h"
 #include "VocBase/LogicalCollection.h"
@@ -206,10 +207,43 @@ void LookupBuilder::buildNextSearchValue() {
 /// @brief determines if two elements are equal
 ////////////////////////////////////////////////////////////////////////////////
 
-static bool IsEqualElementElement(void*,
-                                  IndexElement const* left,
-                                  IndexElement const* right) {
+static bool IsEqualElementElementUnique(void*,
+                                        HashIndexElement const* left,
+                                        HashIndexElement const* right) {
   return left->revisionId() == right->revisionId();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief determines if two elements are equal
+////////////////////////////////////////////////////////////////////////////////
+
+static bool IsEqualElementElementMulti(void* userData,
+                                       HashIndexElement const* left,
+                                       HashIndexElement const* right) {
+  TRI_ASSERT(left != nullptr);
+  TRI_ASSERT(right != nullptr);
+  
+  if (left->revisionId() != right->revisionId()) {
+    return false;
+  }
+  if (left->hash() != right->hash()) {
+    return false;
+  }
+
+  IndexLookupContext* context = static_cast<IndexLookupContext*>(userData);
+  TRI_ASSERT(context != nullptr);
+      
+  for (size_t i = 0; i < context->numFields(); ++i) {
+    VPackSlice leftData = left->slice(context, i);
+    VPackSlice rightData = right->slice(context, i);
+
+    int res = arangodb::basics::VelocyPackHelper::compare(leftData, rightData, false);
+    if (res != 0) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -217,34 +251,32 @@ static bool IsEqualElementElement(void*,
 ////////////////////////////////////////////////////////////////////////////////
 
 static uint64_t HashKey(void*, VPackSlice const* key) {
-  TRI_ASSERT(key->isArray());
-  uint64_t hash = 0x0123456789abcdef;
-  size_t const n = key->length();
- 
-  for (size_t j = 0; j < n; ++j) {
-    // must use normalized hash here, to normalize different representations 
-    // of arrays/objects/numbers
-    hash = (*key)[j].normalizedHash(hash);
-  }
-  
-  return hash;
+  return HashIndexElement::hash(*key);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief determines if a key corresponds to an element
 ////////////////////////////////////////////////////////////////////////////////
 
-static bool IsEqualKeyElement(void*,
-                              VPackSlice const* left,
-                              IndexElement const* right) {
+static bool IsEqualKeyElementMulti(void* userData,
+                                   VPackSlice const* left,
+                                   HashIndexElement const* right) {
   TRI_ASSERT(left->isArray());
   TRI_ASSERT(right->revisionId() != 0);
-  
+  IndexLookupContext* context = static_cast<IndexLookupContext*>(userData);
+  TRI_ASSERT(context != nullptr);
+
+  /* TODO?
+  if (HashIndexElement::hash(left) != right->hash()) {
+    return false;
+  }
+  */
+
   size_t const n = left->length();
   
-  for (size_t j = 0; j < n; ++j) {
-    VPackSlice const leftVPack = (*left)[j];
-    VPackSlice const rightVPack = right->subObject(j)->slice();
+  for (size_t i = 0; i < n; ++i) {
+    VPackSlice const leftVPack = left->at(i);
+    VPackSlice const rightVPack = right->slice(context, i);
   
     int res = arangodb::basics::VelocyPackHelper::compare(leftVPack, rightVPack, false);
     if (res != 0) {
@@ -255,11 +287,13 @@ static bool IsEqualKeyElement(void*,
   return true;
 }
 
-static bool IsEqualKeyElementHash(
-    void* userData, VPackSlice const* left,
-    uint64_t const,  // Has been computed but is not used here
-    IndexElement const* right) {
-  return IsEqualKeyElement(userData, left, right);
+////////////////////////////////////////////////////////////////////////////////
+/// @brief determines if a key corresponds to an element
+////////////////////////////////////////////////////////////////////////////////
+
+static bool IsEqualKeyElementUnique(void* userData, VPackSlice const* left,
+                                    uint64_t, HashIndexElement const* right) {
+  return IsEqualKeyElementMulti(userData, left, right);
 }
 
 HashIndexIterator::HashIndexIterator(LogicalCollection* collection,
@@ -407,8 +441,8 @@ HashIndex::UniqueArray::UniqueArray(
 
 HashIndex::UniqueArray::~UniqueArray() {
   if (_hashArray != nullptr) {
-    auto cb = [this](IndexElement* element) -> bool { 
-      element->free(_numPaths); return true; 
+    auto cb = [this](HashIndexElement* element) -> bool { 
+      element->free(); return true; 
     };
     _hashArray->invokeOnAllElements(cb);
   }
@@ -441,8 +475,8 @@ HashIndex::MultiArray::MultiArray(size_t numPaths,
 
 HashIndex::MultiArray::~MultiArray() {
   if (_hashArray != nullptr) {
-    auto cb = [this](IndexElement* element) -> bool { 
-      element->free(_numPaths); return true; 
+    auto cb = [this](HashIndexElement* element) -> bool { 
+      element->free(); return true; 
     };
     _hashArray->invokeOnAllElements(cb);
   }
@@ -463,12 +497,12 @@ HashIndex::HashIndex(TRI_idx_iid_t iid, LogicalCollection* collection,
     indexBuckets = collection->indexBuckets();
   }
 
-  auto func = std::make_unique<HashElementFunc>(_paths.size());
+  auto func = std::make_unique<HashElementFunc>();
   auto compare = std::make_unique<IsEqualElementElementByKey>(_paths.size());
 
   if (_unique) {
     auto array = std::make_unique<TRI_HashArray_t>(
-        HashKey, *(func.get()), IsEqualKeyElementHash, IsEqualElementElement,
+        HashKey, *(func.get()), IsEqualKeyElementUnique, IsEqualElementElementUnique,
         *(compare.get()), indexBuckets,
         []() -> std::string { return "unique hash-array"; });
 
@@ -479,7 +513,7 @@ HashIndex::HashIndex(TRI_idx_iid_t iid, LogicalCollection* collection,
     _multiArray = nullptr;
 
     auto array = std::make_unique<TRI_HashArrayMulti_t>(
-        HashKey, *(func.get()), IsEqualKeyElement, IsEqualElementElement,
+        HashKey, *(func.get()), IsEqualKeyElementMulti, IsEqualElementElementMulti,
         *(compare.get()), indexBuckets, 64,
         []() -> std::string { return "multi hash-array"; });
 
@@ -530,16 +564,15 @@ double HashIndex::selectivityEstimate() const {
 ////////////////////////////////////////////////////////////////////////////////
 
 size_t HashIndex::memory() const {
-  size_t base;
+  size_t elementSize = HashIndexElement::baseMemoryUsage(_paths.size());
+
   if (_unique) {
-    base = static_cast<size_t>(elementSize() *
+    return static_cast<size_t>(elementSize *
                                    _uniqueArray->_hashArray->size() +
                                _uniqueArray->_hashArray->memoryUsage());
-  } else {
-    base = static_cast<size_t>(elementSize() * _multiArray->_hashArray->size() +
-                             _multiArray->_hashArray->memoryUsage());
   }
-  return base;
+  return static_cast<size_t>(elementSize * _multiArray->_hashArray->size() +
+                             _multiArray->_hashArray->memoryUsage());
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -646,13 +679,12 @@ int HashIndex::insert(arangodb::Transaction* trx, TRI_voc_rid_t revisionId,
 
 int HashIndex::remove(arangodb::Transaction* trx, TRI_voc_rid_t revisionId,
                       VPackSlice const& doc, bool isRollback) {
-  size_t const np = numPaths();
-  std::vector<IndexElement*> elements;
-  int res = fillElement(elements, revisionId, doc);
+  std::vector<HashIndexElement*> elements;
+  int res = fillElement<HashIndexElement>(elements, revisionId, doc);
 
   if (res != TRI_ERROR_NO_ERROR) {
     for (auto& hashElement : elements) {
-      hashElement->free(np);
+      hashElement->free();
     }
     return res;
   }
@@ -670,7 +702,7 @@ int HashIndex::remove(arangodb::Transaction* trx, TRI_voc_rid_t revisionId,
     if (result != TRI_ERROR_NO_ERROR) {
       res = result;
     }
-    hashElement->free(np);
+    hashElement->free();
   }
 
   return res;
@@ -687,11 +719,10 @@ int HashIndex::batchInsert(arangodb::Transaction* trx,
 }
   
 int HashIndex::unload() {
-  size_t const n = numPaths();
   if (_unique) {
-    _uniqueArray->_hashArray->truncate([&n](IndexElement* element) -> bool { element->free(n); return true; });
+    _uniqueArray->_hashArray->truncate([](HashIndexElement* element) -> bool { element->free(); return true; });
   } else {
-    _multiArray->_hashArray->truncate([&n](IndexElement* element) -> bool { element->free(n); return true; });
+    _multiArray->_hashArray->truncate([](HashIndexElement* element) -> bool { element->free(); return true; });
   }
   return TRI_ERROR_NO_ERROR;
 }
@@ -706,12 +737,14 @@ int HashIndex::sizeHint(arangodb::Transaction* trx, size_t size) {
     // than if the index would be fully populated
     size /= 5;
   }
+  
+  IndexLookupContext context(trx, _collection, numPaths());
 
   if (_unique) {
-    return _uniqueArray->_hashArray->resize(trx, size);
+    return _uniqueArray->_hashArray->resize(&context, size);
   }
 
-  return _multiArray->_hashArray->resize(trx, size);
+  return _multiArray->_hashArray->resize(&context, size);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -720,13 +753,16 @@ int HashIndex::sizeHint(arangodb::Transaction* trx, size_t size) {
 
 int HashIndex::lookup(arangodb::Transaction* trx,
                       VPackSlice key,
-                      std::vector<IndexElement*>& documents) const {
+                      std::vector<HashIndexElement*>& documents) const {
   if (key.isNone()) {
     return TRI_ERROR_NO_ERROR;
   }
+
+  IndexLookupContext context(trx, _collection, numPaths()); 
+
   if (_unique) {
-    IndexElement* found =
-        _uniqueArray->_hashArray->findByKey(trx, &key);
+    HashIndexElement* found =
+        _uniqueArray->_hashArray->findByKey(&context, &key);
 
     if (found != nullptr) {
       // unique hash index: maximum number is 1
@@ -737,9 +773,9 @@ int HashIndex::lookup(arangodb::Transaction* trx,
   }
 
   // TODO: optimize this copying!
-  std::vector<IndexElement*> results;
+  std::vector<HashIndexElement*> results;
   try {
-    _multiArray->_hashArray->lookupByKey(trx, &key, results);
+    _multiArray->_hashArray->lookupByKey(&context, &key, results);
   } catch (...) {
     return TRI_ERROR_OUT_OF_MEMORY;
   }
@@ -755,23 +791,24 @@ int HashIndex::lookup(arangodb::Transaction* trx,
 
 int HashIndex::insertUnique(arangodb::Transaction* trx, TRI_voc_rid_t revisionId, 
                             VPackSlice const& doc, bool isRollback) {
-  size_t const np = numPaths();
-  std::vector<IndexElement*> elements;
-  int res = fillElement(elements, revisionId, doc);
+  std::vector<HashIndexElement*> elements;
+  int res = fillElement<HashIndexElement>(elements, revisionId, doc);
 
   if (res != TRI_ERROR_NO_ERROR) {
     for (auto& it : elements) {
       // free all elements to prevent leak
-      it->free(np);
+      it->free();
     }
 
     return res;
   }
+      
+  IndexLookupContext context(trx, _collection, numPaths()); 
 
   auto work =
-      [this, trx](IndexElement* element, bool) -> int {
+      [this, &context](HashIndexElement* element, bool) -> int {
         TRI_IF_FAILURE("InsertHashIndex") { return TRI_ERROR_DEBUG; }
-        return _uniqueArray->_hashArray->insert(trx, element);
+        return _uniqueArray->_hashArray->insert(&context, element);
       };
 
   size_t const n = elements.size();
@@ -783,7 +820,7 @@ int HashIndex::insertUnique(arangodb::Transaction* trx, TRI_voc_rid_t revisionId
     if (res != TRI_ERROR_NO_ERROR) {
       for (size_t j = i; j < n; ++j) {
         // Free all elements that are not yet in the index
-        elements[j]->free(np);
+        elements[j]->free();
       }
       // Already indexed elements will be removed by the rollback
       break;
@@ -795,17 +832,16 @@ int HashIndex::insertUnique(arangodb::Transaction* trx, TRI_voc_rid_t revisionId
 
 int HashIndex::batchInsertUnique(arangodb::Transaction* trx, 
      std::vector<std::pair<TRI_voc_rid_t, VPackSlice>> const& documents, size_t numThreads) {
-  size_t const np = numPaths();
-  std::vector<IndexElement*> elements;
+  std::vector<HashIndexElement*> elements;
   elements.reserve(documents.size());
 
   for (auto& doc : documents) {
-    int res = fillElement(elements, doc.first, doc.second);
+    int res = fillElement<HashIndexElement>(elements, doc.first, doc.second);
 
     if (res != TRI_ERROR_NO_ERROR) {
       for (auto& it : elements) {
         // free all elements to prevent leak
-        it->free(np);
+        it->free();
       }
       return res;
     }
@@ -816,12 +852,14 @@ int HashIndex::batchInsertUnique(arangodb::Transaction* trx,
     return TRI_ERROR_NO_ERROR;
   }
   
-  int res = _uniqueArray->_hashArray->batchInsert(trx, &elements, numThreads);
+  IndexLookupContext context(trx, _collection, numPaths()); 
+  
+  int res = _uniqueArray->_hashArray->batchInsert(&context, &elements, numThreads);
 
   if (res != TRI_ERROR_NO_ERROR) {
     for (auto& it : elements) {
       // free all elements to prevent leak
-      it->free(np);
+      it->free();
     }
   } 
 
@@ -830,28 +868,29 @@ int HashIndex::batchInsertUnique(arangodb::Transaction* trx,
 
 int HashIndex::insertMulti(arangodb::Transaction* trx, TRI_voc_rid_t revisionId,
                            VPackSlice const& doc, bool isRollback) {
-  size_t const np = numPaths();
-  std::vector<IndexElement*> elements;
-  int res = fillElement(elements, revisionId, doc);
+  std::vector<HashIndexElement*> elements;
+  int res = fillElement<HashIndexElement>(elements, revisionId, doc);
 
   if (res != TRI_ERROR_NO_ERROR) {
     for (auto& hashElement : elements) {
-      hashElement->free(np);
+      hashElement->free();
     }
     return res;
   }
+  
+  IndexLookupContext context(trx, _collection, numPaths()); 
 
-  auto work = [this, trx, np](IndexElement*& element, bool) {
+  auto work = [this, &context](HashIndexElement*& element, bool) {
     TRI_IF_FAILURE("InsertHashIndex") {
       THROW_ARANGO_EXCEPTION(TRI_ERROR_DEBUG);
     }
 
-    IndexElement* found =
-        _multiArray->_hashArray->insert(trx, element, false, true);
+    HashIndexElement* found =
+        _multiArray->_hashArray->insert(&context, element, false, true);
 
     if (found != nullptr) {
       // already got the exact same index entry. now free our local element...
-      element->free(np);
+      element->free();
     }
   };
 
@@ -871,7 +910,7 @@ int HashIndex::insertMulti(arangodb::Transaction* trx, TRI_voc_rid_t revisionId,
     if (res != TRI_ERROR_NO_ERROR) {
       for (size_t j = i; j < n; ++j) {
         // Free all elements that are not yet in the index
-        elements[j]->free(np);
+        elements[j]->free();
       }
       for (size_t j = 0; j < i; ++j) {
         // Remove all already indexed elements and free them
@@ -889,18 +928,17 @@ int HashIndex::insertMulti(arangodb::Transaction* trx, TRI_voc_rid_t revisionId,
 
 int HashIndex::batchInsertMulti(arangodb::Transaction* trx, 
         std::vector<std::pair<TRI_voc_rid_t, VPackSlice>> const& documents, size_t numThreads) {
-  size_t const np = numPaths();
-  std::vector<IndexElement*> elements;
+  std::vector<HashIndexElement*> elements;
   elements.reserve(documents.size());
 
   for (auto& doc : documents) {
-    int res = fillElement(elements, doc.first, doc.second);
+    int res = fillElement<HashIndexElement>(elements, doc.first, doc.second);
 
     if (res != TRI_ERROR_NO_ERROR) {
       // Filling the elements failed for some reason. Assume loading as failed
       for (auto& el : elements) {
         // Free all elements that are not yet in the index
-        el->free(np);
+        el->free();
       }
       return res;
     }
@@ -911,14 +949,16 @@ int HashIndex::batchInsertMulti(arangodb::Transaction* trx,
     return TRI_ERROR_NO_ERROR;
   }
   
-  return _multiArray->_hashArray->batchInsert(trx, &elements, numThreads);
+  IndexLookupContext context(trx, _collection, numPaths()); 
+  return _multiArray->_hashArray->batchInsert(&context, &elements, numThreads);
 }
 
 int HashIndex::removeUniqueElement(arangodb::Transaction* trx,
-                                   IndexElement* element,
+                                   HashIndexElement* element,
                                    bool isRollback) {
   TRI_IF_FAILURE("RemoveHashIndex") { return TRI_ERROR_DEBUG; }
-  IndexElement* old = _uniqueArray->_hashArray->remove(trx, element);
+  IndexLookupContext context(trx, _collection, numPaths()); 
+  HashIndexElement* old = _uniqueArray->_hashArray->remove(&context, element);
 
   if (old == nullptr) {
     // not found
@@ -927,16 +967,17 @@ int HashIndex::removeUniqueElement(arangodb::Transaction* trx,
     }
     return TRI_ERROR_INTERNAL;
   }
-  old->free(numPaths());
+  old->free();
 
   return TRI_ERROR_NO_ERROR;
 }
 
 int HashIndex::removeMultiElement(arangodb::Transaction* trx,
-                                  IndexElement* element,
+                                  HashIndexElement* element,
                                   bool isRollback) {
   TRI_IF_FAILURE("RemoveHashIndex") { return TRI_ERROR_DEBUG; }
-  IndexElement* old = _multiArray->_hashArray->remove(trx, element);
+  IndexLookupContext context(trx, _collection, numPaths()); 
+  HashIndexElement* old = _multiArray->_hashArray->remove(&context, element);
 
   if (old == nullptr) {
     // not found
@@ -945,7 +986,7 @@ int HashIndex::removeMultiElement(arangodb::Transaction* trx,
     }
     return TRI_ERROR_INTERNAL;
   }
-  old->free(numPaths());
+  old->free();
 
   return TRI_ERROR_NO_ERROR;
 }

@@ -107,7 +107,7 @@ class HashIndexIterator final : public IndexIterator {
  private:
   HashIndex const* _index;
   LookupBuilder _lookups;
-  std::vector<IndexElement*> _buffer;
+  std::vector<HashIndexElement*> _buffer;
   size_t _posInBuffer;
 };
 
@@ -142,7 +142,7 @@ class HashIndexIteratorVPack final : public IndexIterator {
   HashIndex const* _index;
   std::unique_ptr<arangodb::velocypack::Builder> _searchValues;
   arangodb::velocypack::ArrayIterator _iterator;
-  std::vector<IndexElement*> _buffer;
+  std::vector<HashIndexElement*> _buffer;
   size_t _posInBuffer;
 };
 
@@ -220,7 +220,7 @@ class HashIndex final : public PathBasedIndex {
 
   /// @brief locates entries in the hash index given a velocypack slice
   int lookup(arangodb::Transaction*, arangodb::velocypack::Slice,
-             std::vector<IndexElement*>&) const;
+             std::vector<HashIndexElement*>&) const;
 
   int insertUnique(arangodb::Transaction*, TRI_voc_rid_t, arangodb::velocypack::Slice const&, bool isRollback);
 
@@ -232,9 +232,9 @@ class HashIndex final : public PathBasedIndex {
   int batchInsertMulti(arangodb::Transaction*,
                        std::vector<std::pair<TRI_voc_rid_t, arangodb::velocypack::Slice>> const&, size_t);
 
-  int removeUniqueElement(arangodb::Transaction*, IndexElement*, bool);
+  int removeUniqueElement(arangodb::Transaction*, HashIndexElement*, bool);
 
-  int removeMultiElement(arangodb::Transaction*, IndexElement*, bool);
+  int removeMultiElement(arangodb::Transaction*, HashIndexElement*, bool);
 
   bool accessFitsIndex(arangodb::aql::AstNode const* access,
                        arangodb::aql::AstNode const* other,
@@ -247,22 +247,13 @@ class HashIndex final : public PathBasedIndex {
 
  private:
   class HashElementFunc {
-    size_t _numFields;
-
    public:
-    explicit HashElementFunc(size_t n) : _numFields(n) {}
+    HashElementFunc() {}
 
-    uint64_t operator()(void*, IndexElement const* element,
+    uint64_t operator()(void* userData, HashIndexElement const* element,
                         bool byKey = true) {
-      uint64_t hash = 0x0123456789abcdef;
-
-      for (size_t j = 0; j < _numFields; j++) {
-        VPackSlice data = element->slice(j);
-        // must use normalized hash here, to normalize different representations 
-        // of arrays/objects/numbers
-        hash = data.normalizedHash(hash);
-      }
-
+      uint64_t hash = element->hash();
+      
       if (byKey) {
         return hash;
       }
@@ -282,8 +273,8 @@ class HashIndex final : public PathBasedIndex {
    public:
     explicit IsEqualElementElementByKey(size_t n) : _numFields(n) {}
 
-    bool operator()(void*, IndexElement const* left,
-                    IndexElement const* right) {
+    bool operator()(void* userData, HashIndexElement const* left,
+                    HashIndexElement const* right) {
       TRI_ASSERT(left->revisionId() != 0);
       TRI_ASSERT(right->revisionId() != 0);
 
@@ -291,9 +282,11 @@ class HashIndex final : public PathBasedIndex {
         return true;
       }
 
-      for (size_t j = 0; j < _numFields; ++j) {
-        VPackSlice leftData = left->subObject(j)->slice();
-        VPackSlice rightData = right->subObject(j)->slice();
+      IndexLookupContext* context = static_cast<IndexLookupContext*>(userData);
+  
+      for (size_t i = 0; i < _numFields; ++i) {
+        VPackSlice leftData = left->slice(context, i);
+        VPackSlice rightData = right->slice(context, i);
 
         int res = arangodb::basics::VelocyPackHelper::compare(leftData, rightData, false);
         if (res != 0) {
@@ -312,7 +305,7 @@ class HashIndex final : public PathBasedIndex {
   //////////////////////////////////////////////////////////////////////////////
 
   typedef arangodb::basics::AssocUnique<arangodb::velocypack::Slice,
-                                        IndexElement*> TRI_HashArray_t;
+                                        HashIndexElement*> TRI_HashArray_t;
 
   struct UniqueArray {
     UniqueArray() = delete;
@@ -332,8 +325,8 @@ class HashIndex final : public PathBasedIndex {
   //////////////////////////////////////////////////////////////////////////////
 
   typedef arangodb::basics::AssocMulti<arangodb::velocypack::Slice,
-                                       IndexElement*, uint32_t,
-                                       true> TRI_HashArrayMulti_t;
+                                       HashIndexElement*, uint32_t,
+                                       false> TRI_HashArrayMulti_t;
 
   struct MultiArray {
     MultiArray() = delete;

@@ -37,9 +37,10 @@ namespace arangodb {
 class IndexLookupContext {
  public:
   IndexLookupContext() = delete;
-  IndexLookupContext(Transaction* trx, LogicalCollection* collection) :
-      _trx(trx), _collection(collection) {
+  IndexLookupContext(Transaction* trx, LogicalCollection* collection, size_t numFields) :
+      _trx(trx), _collection(collection), _numFields(numFields) {
     TRI_ASSERT(_trx != nullptr);
+    TRI_ASSERT(_collection != nullptr);
   }
 
   ~IndexLookupContext() {}
@@ -56,9 +57,12 @@ class IndexLookupContext {
     return nullptr;
   }
 
+  size_t numFields() const { return _numFields; }
+
  private:
   Transaction* _trx;
   LogicalCollection* _collection;
+  size_t const _numFields;
 };
 
 }
