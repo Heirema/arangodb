@@ -293,6 +293,8 @@ void TraversalBlock::initializePaths(AqlItemBlock const* items, size_t pos) {
     return;
   }
         
+  initializeExpressions(items, pos);
+
   if (!_useRegister) {
     if (!_usedConstant) {
       _usedConstant = true;
@@ -325,7 +327,6 @@ void TraversalBlock::initializePaths(AqlItemBlock const* items, size_t pos) {
                                        "allowed");
     }
   }
-  initializeExpressions(items, pos);
 
   // cppcheck-suppress style
   DEBUG_END_BLOCK();
