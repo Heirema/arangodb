@@ -55,8 +55,14 @@ static int FetchDocumentById(arangodb::Transaction* trx,
   return res;
 }
 
-SingleServerEdgeCursor::SingleServerEdgeCursor(Transaction* trx, size_t nrCursors)
-    : _trx(trx), _cursors(), _currentCursor(0), _currentSubCursor(0), _cachePos(0) {
+SingleServerEdgeCursor::SingleServerEdgeCursor(Transaction* trx,
+    size_t nrCursors, std::vector<size_t> const* mapping)
+    : _trx(trx), 
+      _cursors(),
+      _currentCursor(0),
+      _currentSubCursor(0),
+      _cachePos(0),
+      _internalCursorMapping(mapping) {
   _cursors.reserve(nrCursors);
   _cache.reserve(1000);
 };
@@ -75,7 +81,12 @@ bool SingleServerEdgeCursor::next(std::vector<VPackSlice>& result,
       uint8_t const* vpack = mmdr.back();
       result.emplace_back(vpack);
     }
-    cursorId = _currentCursor;
+    if (_internalCursorMapping != nullptr) {
+      TRI_ASSERT(_currentCursor < _internalCursorMapping->size());
+      cursorId = _internalCursorMapping->at(_currentCursor);
+    } else {
+      cursorId = _currentCursor;
+    }
     return true;
   }
   // We need to refill the cache.
@@ -122,7 +133,12 @@ bool SingleServerEdgeCursor::next(std::vector<VPackSlice>& result,
     uint8_t const* vpack = mmdr.back();
     result.emplace_back(vpack);
   }
-  cursorId = _currentCursor;
+  if (_internalCursorMapping != nullptr) {
+    TRI_ASSERT(_currentCursor < _internalCursorMapping->size());
+    cursorId = _internalCursorMapping->at(_currentCursor);
+  } else {
+    cursorId = _currentCursor;
+  }
   return true;
 }
 
@@ -134,7 +150,13 @@ bool SingleServerEdgeCursor::readAll(std::unordered_set<VPackSlice>& result,
   
   ManagedMultiDocumentResult mmdr; // TODO
 
-  cursorId = _currentCursor;
+  if (_internalCursorMapping != nullptr) {
+    TRI_ASSERT(_currentCursor < _internalCursorMapping->size());
+    cursorId = _internalCursorMapping->at(_currentCursor);
+  } else {
+    cursorId = _currentCursor;
+  }
+  
   auto& cursorSet = _cursors[_currentCursor];
   for (auto& cursor : cursorSet) {
     LogicalCollection* collection = cursor->collection(); 

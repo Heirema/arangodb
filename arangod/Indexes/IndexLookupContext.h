@@ -37,8 +37,8 @@ namespace arangodb {
 class IndexLookupContext {
  public:
   IndexLookupContext() = delete;
-  IndexLookupContext(Transaction* trx, LogicalCollection* collection, size_t numFields) :
-      _trx(trx), _collection(collection), _numFields(numFields) {
+  IndexLookupContext(Transaction* trx, LogicalCollection* collection, size_t numFields) 
+      : _trx(trx), _collection(collection), _numFields(numFields) {
     TRI_ASSERT(_trx != nullptr);
     TRI_ASSERT(_collection != nullptr);
   }
@@ -47,7 +47,6 @@ class IndexLookupContext {
 
   uint8_t const* lookup(TRI_voc_rid_t revisionId) {
     try {
-      TRI_ASSERT(_trx != nullptr);
       ManagedDocumentResult result; // TODO
       if (_collection->readRevision(_trx, result, revisionId)) {
         return result.vpack();
@@ -57,7 +56,7 @@ class IndexLookupContext {
     return nullptr;
   }
 
-  size_t numFields() const { return _numFields; }
+  inline size_t numFields() const { return _numFields; }
 
  private:
   Transaction* _trx;

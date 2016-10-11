@@ -210,6 +210,7 @@ void LookupBuilder::buildNextSearchValue() {
 static bool IsEqualElementElementUnique(void*,
                                         HashIndexElement const* left,
                                         HashIndexElement const* right) {
+  // this is quite simple
   return left->revisionId() == right->revisionId();
 }
 
@@ -266,12 +267,7 @@ static bool IsEqualKeyElementMulti(void* userData,
   IndexLookupContext* context = static_cast<IndexLookupContext*>(userData);
   TRI_ASSERT(context != nullptr);
 
-  /* TODO?
-  if (HashIndexElement::hash(left) != right->hash()) {
-    return false;
-  }
-  */
-
+  // TODO: is it a performance improvement to compare the hash values first?
   size_t const n = left->length();
   
   for (size_t i = 0; i < n; ++i) {
@@ -492,8 +488,6 @@ HashIndex::HashIndex(TRI_idx_iid_t iid, LogicalCollection* collection,
   uint32_t indexBuckets = 1;
 
   if (collection != nullptr) {
-    // document is a nullptr in the coordinator case
-    // TODO: That ain't true any more
     indexBuckets = collection->indexBuckets();
   }
 

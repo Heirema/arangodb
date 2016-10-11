@@ -48,9 +48,10 @@ class SingleServerEdgeCursor : public EdgeCursor {
   size_t _currentSubCursor;
   std::vector<IndexLookupResult> _cache;
   size_t _cachePos;
+  std::vector<size_t> const* _internalCursorMapping;
 
  public:
-  SingleServerEdgeCursor(arangodb::Transaction* trx, size_t);
+  SingleServerEdgeCursor(arangodb::Transaction* trx, size_t, std::vector<size_t> const* mapping = nullptr);
 
   ~SingleServerEdgeCursor() {
     for (auto& it : _cursors) {
