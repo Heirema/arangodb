@@ -100,7 +100,8 @@ Expression::~Expression() {
         delete[] _data;
         break;
 
-      case ATTRIBUTE: {
+      case ATTRIBUTE_SYSTEM: 
+      case ATTRIBUTE_DYNAMIC: {
         TRI_ASSERT(_accessor != nullptr);
         delete _accessor;
         break;
@@ -147,9 +148,14 @@ AqlValue Expression::execute(arangodb::Transaction* trx, ExpressionContext* ctx,
       return executeSimpleExpression(_node, trx, mustDestroy, true);
     }
 
-    case ATTRIBUTE: {
+    case ATTRIBUTE_SYSTEM: {
       TRI_ASSERT(_accessor != nullptr);
-      return _accessor->get(trx, ctx, mustDestroy);
+      return _accessor->getSystem(trx, ctx, mustDestroy);
+    }
+
+    case ATTRIBUTE_DYNAMIC: {
+      TRI_ASSERT(_accessor != nullptr);
+      return _accessor->getDynamic(trx, ctx, mustDestroy);
     }
 
     case V8: {
@@ -187,7 +193,7 @@ void Expression::replaceVariables(
 
   _node = _ast->replaceVariables(const_cast<AstNode*>(_node), replacements);
   
-  if (_type == ATTRIBUTE && _accessor != nullptr) {
+  if ((_type == ATTRIBUTE_SYSTEM || _type == ATTRIBUTE_DYNAMIC) && _accessor != nullptr) {
     _accessor->replaceVariable(replacements);
   }
 
@@ -206,7 +212,7 @@ void Expression::replaceVariableReference(Variable const* variable,
                                          node);
   invalidate();
 
-  if (_type == ATTRIBUTE) {
+  if (_type == ATTRIBUTE_SYSTEM || _type == ATTRIBUTE_DYNAMIC) {
     if (_built) {
       delete _accessor;
       _accessor = nullptr;
@@ -363,7 +369,11 @@ void Expression::analyzeExpression() {
 
         // specialize the simple expression into an attribute accessor
         _accessor = new AttributeAccessor(std::move(parts), v);
-        _type = ATTRIBUTE;
+        if (_accessor->isDynamic()) {
+          _type = ATTRIBUTE_DYNAMIC;
+        } else {
+          _type = ATTRIBUTE_SYSTEM;
+        }
         _built = true;
       }
     }

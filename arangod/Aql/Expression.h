@@ -52,9 +52,9 @@ struct V8Expression;
 
 /// @brief AqlExpression, used in execution plans and execution blocks
 class Expression {
-  enum ExpressionType : uint32_t { UNPROCESSED, JSON, V8, SIMPLE, ATTRIBUTE };
-
  public:
+  enum ExpressionType : uint32_t { UNPROCESSED, JSON, V8, SIMPLE, ATTRIBUTE_SYSTEM, ATTRIBUTE_DYNAMIC };
+
   Expression(Expression const&) = delete;
   Expression& operator=(Expression const&) = delete;
   Expression() = delete;
@@ -154,7 +154,8 @@ class Expression {
         return "json";
       case SIMPLE:
         return "simple";
-      case ATTRIBUTE:
+      case ATTRIBUTE_SYSTEM:
+      case ATTRIBUTE_DYNAMIC:
         return "attribute";
       case V8:
         return "v8";
