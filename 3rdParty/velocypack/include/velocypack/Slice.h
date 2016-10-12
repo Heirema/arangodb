@@ -282,7 +282,7 @@ class Slice {
       uint64_t dv;
       double d;
     } v;
-    v.dv = readInteger<uint64_t>(_start + 1, 8);
+    v.dv = readIntegerFixed<uint64_t, 8>(_start + 1);
     return v.d;
   }
 
@@ -329,7 +329,8 @@ class Slice {
     }
 
     ValueLength const offsetSize = indexEntrySize(h);
-    ValueLength end = readInteger<ValueLength>(_start + 1, offsetSize);
+    VELOCYPACK_ASSERT(offsetSize > 0);
+    ValueLength end = readIntegerNonEmpty<ValueLength>(_start + 1, offsetSize);
 
     // find number of items
     if (h <= 0x05) {  // No offset table or length, need to compute:
@@ -337,10 +338,10 @@ class Slice {
       Slice first(_start + firstSubOffset);
       return (end - firstSubOffset) / first.byteSize();
     } else if (offsetSize < 8) {
-      return readInteger<ValueLength>(_start + offsetSize + 1, offsetSize);
+      return readIntegerNonEmpty<ValueLength>(_start + offsetSize + 1, offsetSize);
     }
 
-    return readInteger<ValueLength>(_start + end - offsetSize, offsetSize);
+    return readIntegerNonEmpty<ValueLength>(_start + end - offsetSize, offsetSize);
   }
 
   // extract a key from an Object at the specified index
@@ -572,7 +573,7 @@ class Slice {
     if (!isUTCDate()) {
       throw Exception(Exception::InvalidValueType, "Expecting type UTCDate");
     }
-    uint64_t v = readInteger<uint64_t>(_start + 1, sizeof(uint64_t));
+    uint64_t v = readIntegerFixed<uint64_t, sizeof(uint64_t)>(_start + 1);
     return toInt64(v);
   }
 
@@ -587,7 +588,7 @@ class Slice {
 
     if (h == 0xbf) {
       // long UTF-8 String
-      length = readInteger<ValueLength>(_start + 1, 8);
+      length = readIntegerFixed<ValueLength, 8>(_start + 1);
       checkOverflow(length);
       return reinterpret_cast<char const*>(_start + 1 + 8);
     }
@@ -606,7 +607,7 @@ class Slice {
 
     if (h == 0xbf) {
       // long UTF-8 String
-      return readInteger<ValueLength>(_start + 1, 8);
+      return readIntegerFixed<ValueLength, 8>(_start + 1);
     }
 
     throw Exception(Exception::InvalidValueType, "Expecting type String");
@@ -623,7 +624,7 @@ class Slice {
     }
 
     if (h == 0xbf) {
-      ValueLength length = readInteger<ValueLength>(_start + 1, 8);
+      ValueLength length = readIntegerFixed<ValueLength, 8>(_start + 1);
       return std::string(reinterpret_cast<char const*>(_start + 1 + 8),
                          checkOverflow(length));
     }
@@ -640,7 +641,7 @@ class Slice {
     uint8_t const h = head();
     VELOCYPACK_ASSERT(h >= 0xc0 && h <= 0xc7);
 
-    length = readInteger<ValueLength>(_start + 1, h - 0xbf);
+    length = readIntegerNonEmpty<ValueLength>(_start + 1, h - 0xbf);
     checkOverflow(length);
     return _start + 1 + h - 0xbf;
   }
@@ -654,7 +655,7 @@ class Slice {
     uint8_t const h = head();
     VELOCYPACK_ASSERT(h >= 0xc0 && h <= 0xc7);
 
-    return readInteger<ValueLength>(_start + 1, h - 0xbf);
+    return readIntegerNonEmpty<ValueLength>(_start + 1, h - 0xbf);
   }
 
   // return a copy of the value for a Binary object
@@ -667,7 +668,7 @@ class Slice {
     VELOCYPACK_ASSERT(h >= 0xc0 && h <= 0xc7);
 
     std::vector<uint8_t> out;
-    ValueLength length = readInteger<ValueLength>(_start + 1, h - 0xbf);
+    ValueLength length = readIntegerNonEmpty<ValueLength>(_start + 1, h - 0xbf);
     checkOverflow(length);
     out.reserve(static_cast<size_t>(length));
     out.insert(out.end(), _start + 1 + h - 0xbf,
@@ -703,7 +704,7 @@ class Slice {
           return 1;
         }
 
-        VELOCYPACK_ASSERT(h <= 0x0e);
+        VELOCYPACK_ASSERT(h > 0x00 && h <= 0x0e);
         return readInteger<ValueLength>(_start + 1,
                                         SliceStaticData::WidthMap[h]);
       }
@@ -732,13 +733,13 @@ class Slice {
         }
         // long UTF-8 String
         return static_cast<ValueLength>(
-            1 + 8 + readInteger<ValueLength>(_start + 1, 8));
+            1 + 8 + readIntegerFixed<ValueLength, 8>(_start + 1));
       }
 
       case ValueType::Binary: {
         auto const h = head();
         return static_cast<ValueLength>(
-            1 + h - 0xbf + readInteger<ValueLength>(_start + 1, h - 0xbf));
+            1 + h - 0xbf + readIntegerNonEmpty<ValueLength>(_start + 1, h - 0xbf));
       }
 
       case ValueType::BCD: {
@@ -761,25 +762,25 @@ class Slice {
           case 0xf4: 
           case 0xf5: 
           case 0xf6: {
-            return 2 + readInteger<ValueLength>(_start + 1, 1);
+            return 2 + readIntegerFixed<ValueLength, 1>(_start + 1);
           }
 
           case 0xf7: 
           case 0xf8: 
           case 0xf9:  {
-            return 3 + readInteger<ValueLength>(_start + 1, 2);
+            return 3 + readIntegerFixed<ValueLength, 2>(_start + 1);
           }
           
           case 0xfa: 
           case 0xfb: 
           case 0xfc: {
-            return 5 + readInteger<ValueLength>(_start + 1, 4);
+            return 5 + readIntegerFixed<ValueLength, 4>(_start + 1);
           }
           
           case 0xfd: 
           case 0xfe: 
           case 0xff: {
-            return 9 + readInteger<ValueLength>(_start + 1, 8);
+            return 9 + readIntegerFixed<ValueLength, 8>(_start + 1);
           }
 
           default: {
@@ -818,7 +819,7 @@ class Slice {
 
   int compareString(char const* value, size_t length) const;
   
-  int compareString(std::string const& attribute) const {
+  inline int compareString(std::string const& attribute) const {
     return compareString(attribute.c_str(), attribute.size());
   }
 
@@ -860,7 +861,7 @@ class Slice {
     if (h == 0xbf) {
       // long UTF-8 String
       return static_cast<ValueLength>(
-        1 + 8 + readInteger<ValueLength>(_start + 1, 8));
+        1 + 8 + readIntegerFixed<ValueLength, 8>(_start + 1));
     }
     return static_cast<ValueLength>(1 + h - 0x40);
   }
@@ -885,7 +886,7 @@ class Slice {
   ValueLength getNthOffsetFromCompact(ValueLength index) const;
 
   inline ValueLength indexEntrySize(uint8_t head) const noexcept {
-    VELOCYPACK_ASSERT(head <= 0x12);
+    VELOCYPACK_ASSERT(head > 0x00 && head <= 0x12);
     return static_cast<ValueLength>(SliceStaticData::WidthMap[head]);
   }
 

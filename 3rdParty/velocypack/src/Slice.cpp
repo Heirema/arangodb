@@ -371,7 +371,7 @@ uint64_t Slice::getUIntUnchecked() const {
   uint8_t const h = head();
   if (h >= 0x28 && h <= 0x2f) {
     // UInt
-    return readInteger<uint64_t>(_start + 1, h - 0x27);
+    return readIntegerNonEmpty<uint64_t>(_start + 1, h - 0x27);
   }
 
   if (h >= 0x30 && h <= 0x39) {
@@ -464,14 +464,18 @@ Slice Slice::get(std::string const& attribute) const {
   }
 
   ValueLength const offsetSize = indexEntrySize(h);
-  ValueLength end = readInteger<ValueLength>(_start + 1, offsetSize);
+  VELOCYPACK_ASSERT(offsetSize > 0);
+  ValueLength end = readIntegerNonEmpty<ValueLength>(_start + 1, offsetSize);
 
   // read number of items
   ValueLength n;
+  ValueLength ieBase;
   if (offsetSize < 8) {
-    n = readInteger<ValueLength>(_start + 1 + offsetSize, offsetSize);
+    n = readIntegerNonEmpty<ValueLength>(_start + 1 + offsetSize, offsetSize);
+    ieBase = end - n * offsetSize;
   } else {
-    n = readInteger<ValueLength>(_start + end - offsetSize, offsetSize);
+    n = readIntegerNonEmpty<ValueLength>(_start + end - offsetSize, offsetSize);
+    ieBase = end - n * offsetSize - offsetSize;
   }
 
   if (n == 1) {
@@ -497,15 +501,12 @@ Slice Slice::get(std::string const& attribute) const {
     return Slice();
   }
 
-  ValueLength const ieBase =
-      end - n * offsetSize - (offsetSize == 8 ? offsetSize : 0);
-
   // only use binary search for attributes if we have at least this many entries
   // otherwise we'll always use the linear search
   static ValueLength const SortedSearchEntriesThreshold = 4;
 
-  bool const isSorted = (h >= 0x0b && h <= 0x0e);
-  if (isSorted && n >= SortedSearchEntriesThreshold) {
+  // bool const isSorted = (h >= 0x0b && h <= 0x0e);
+  if (n >= SortedSearchEntriesThreshold && (h >= 0x0b && h <= 0x0e)) {
     // This means, we have to handle the special case n == 1 only
     // in the linear search!
     return searchObjectKeyBinary(attribute, ieBase, offsetSize, n);
@@ -519,7 +520,7 @@ int64_t Slice::getInt() const {
   uint8_t const h = head();
   if (h >= 0x20 && h <= 0x27) {
     // Int  T
-    uint64_t v = readInteger<uint64_t>(_start + 1, h - 0x1f);
+    uint64_t v = readIntegerNonEmpty<uint64_t>(_start + 1, h - 0x1f);
     if (h == 0x27) {
       return toInt64(v);
     } else {
@@ -551,7 +552,7 @@ uint64_t Slice::getUInt() const {
   uint8_t const h = head();
   if (h >= 0x28 && h <= 0x2f) {
     // UInt
-    return readInteger<uint64_t>(_start + 1, h - 0x27);
+    return readIntegerNonEmpty<uint64_t>(_start + 1, h - 0x27);
   }
 
   if (h >= 0x20 && h <= 0x27) {
@@ -655,7 +656,7 @@ ValueLength Slice::getNthOffset(ValueLength index) const {
   }
 
   ValueLength const offsetSize = indexEntrySize(h);
-  ValueLength end = readInteger<ValueLength>(_start + 1, offsetSize);
+  ValueLength end = readIntegerNonEmpty<ValueLength>(_start + 1, offsetSize);
 
   ValueLength dataOffset = 0;
 
@@ -666,9 +667,9 @@ ValueLength Slice::getNthOffset(ValueLength index) const {
     Slice first(_start + dataOffset);
     n = (end - dataOffset) / first.byteSize();
   } else if (offsetSize < 8) {
-    n = readInteger<ValueLength>(_start + 1 + offsetSize, offsetSize);
+    n = readIntegerNonEmpty<ValueLength>(_start + 1 + offsetSize, offsetSize);
   } else {
-    n = readInteger<ValueLength>(_start + end - offsetSize, offsetSize);
+    n = readIntegerNonEmpty<ValueLength>(_start + end - offsetSize, offsetSize);
   }
 
   if (index >= n) {
@@ -689,7 +690,7 @@ ValueLength Slice::getNthOffset(ValueLength index) const {
 
   ValueLength const ieBase =
       end - n * offsetSize + index * offsetSize - (offsetSize == 8 ? 8 : 0);
-  return readInteger<ValueLength>(_start + ieBase, offsetSize);
+  return readIntegerNonEmpty<ValueLength>(_start + ieBase, offsetSize);
 }
 
 // extract the nth member from an Array
@@ -757,7 +758,7 @@ Slice Slice::searchObjectKeyLinear(std::string const& attribute,
 
   for (ValueLength index = 0; index < n; ++index) {
     ValueLength offset = ieBase + index * offsetSize;
-    Slice key(_start + readInteger<ValueLength>(_start + offset, offsetSize));
+    Slice key(_start + readIntegerNonEmpty<ValueLength>(_start + offset, offsetSize));
 
     if (key.isString()) {
       if (!key.isEqualString(attribute)) {
@@ -800,7 +801,7 @@ Slice Slice::searchObjectKeyBinary(std::string const& attribute,
     ValueLength index = l + ((r - l) / 2);
 
     ValueLength offset = ieBase + index * offsetSize;
-    Slice key(_start + readInteger<ValueLength>(_start + offset, offsetSize));
+    Slice key(_start + readIntegerNonEmpty<ValueLength>(_start + offset, offsetSize));
 
     int res;
     if (key.isString()) {
