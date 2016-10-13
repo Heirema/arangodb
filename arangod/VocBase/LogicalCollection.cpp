@@ -3549,7 +3549,8 @@ void LogicalCollection::removeRevision(TRI_voc_rid_t revisionId, bool updateStat
 /// @brief a method to skip certain documents in AQL write operations,
 /// this is only used in the enterprise edition for smart graphs
 #ifndef USE_ENTERPRISE
-bool LogicalCollection::skipForAqlWrite(arangodb::velocypack::Slice document) const {
+bool LogicalCollection::skipForAqlWrite(arangodb::velocypack::Slice document,
+                                        std::string const& key) const {
   return false;
 }
 #endif
