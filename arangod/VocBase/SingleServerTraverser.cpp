@@ -75,7 +75,7 @@ bool SingleServerEdgeCursor::next(std::vector<VPackSlice>& result,
   _cachePos++;
   if (_cachePos < _cache.size()) {
     LogicalCollection* collection = _cursors[_currentCursor][_currentSubCursor]->collection();
-    ManagedMultiDocumentResult mmdr;
+    ManagedMultiDocumentResult mmdr(_trx);
     TRI_voc_rid_t revisionId = _cache[_cachePos].revisionId();
     if (collection->readRevision(_trx, mmdr, revisionId)) {
       uint8_t const* vpack = mmdr.back();
@@ -125,7 +125,7 @@ bool SingleServerEdgeCursor::next(std::vector<VPackSlice>& result,
     }
   } while (_cache.empty());
 
-  ManagedMultiDocumentResult mmdr;
+  ManagedMultiDocumentResult mmdr(_trx);
   TRI_ASSERT(_cachePos < _cache.size());
   LogicalCollection* collection = cursor->collection();
   TRI_voc_rid_t revisionId = _cache[_cachePos].revisionId();
@@ -148,7 +148,7 @@ bool SingleServerEdgeCursor::readAll(std::unordered_set<VPackSlice>& result,
     return false;
   }
   
-  ManagedMultiDocumentResult mmdr; // TODO
+  ManagedMultiDocumentResult mmdr(_trx); // TODO
 
   if (_internalCursorMapping != nullptr) {
     TRI_ASSERT(_currentCursor < _internalCursorMapping->size());
@@ -188,7 +188,7 @@ aql::AqlValue SingleServerTraverser::fetchVertexData(VPackSlice id) {
   auto it = _vertices.find(id);
 
   if (it == _vertices.end()) {
-    ManagedDocumentResult doc;
+    ManagedDocumentResult doc(_trx);
     StringRef ref(id);
     int res = FetchDocumentById(_trx, ref, doc);
     ++_readDocuments;
@@ -214,7 +214,7 @@ void SingleServerTraverser::addVertexToVelocyPack(VPackSlice id,
   auto it = _vertices.find(id);
 
   if (it == _vertices.end()) {
-    ManagedDocumentResult doc;
+    ManagedDocumentResult doc(_trx);
     StringRef ref(id);
     int res = FetchDocumentById(_trx, ref, doc);
     ++_readDocuments;

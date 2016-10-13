@@ -2653,7 +2653,7 @@ int LogicalCollection::fillIndexBatch(arangodb::Transaction* trx,
 
   int res = TRI_ERROR_NO_ERROR;
     
-  ManagedMultiDocumentResult result;
+  ManagedMultiDocumentResult* mmdr = trx->documentResult(trx->documentCollection(_cid)); // TODO
 
   std::vector<std::pair<TRI_voc_rid_t, VPackSlice>> documents;
   documents.reserve(blockSize);
@@ -2671,10 +2671,11 @@ int LogicalCollection::fillIndexBatch(arangodb::Transaction* trx,
       
       TRI_voc_rid_t revisionId = element.revisionId();
 
-      if (readRevision(trx, result, revisionId)) {
-        uint8_t const* vpack = result.back();
+      if (readRevision(trx, *mmdr, revisionId)) {
+        uint8_t const* vpack = mmdr->back();
         TRI_ASSERT(vpack != nullptr);
         documents.emplace_back(std::make_pair(revisionId, VPackSlice(vpack)));
+        mmdr->clear();
       }
 
       if (documents.size() == blockSize) {
@@ -2731,7 +2732,7 @@ int LogicalCollection::fillIndexSequential(arangodb::Transaction* trx,
 
     arangodb::basics::BucketPosition position;
     uint64_t total = 0;
-    ManagedDocumentResult result;
+    ManagedDocumentResult result(trx);
 
     while (true) {
       SimpleIndexElement element = primaryIndex->lookupSequential(trx, position, total);

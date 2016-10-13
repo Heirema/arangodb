@@ -42,7 +42,8 @@ CollectionExport::CollectionExport(TRI_vocbase_t* vocbase,
       _ditch(nullptr),
       _name(name),
       _resolver(vocbase),
-      _restrictions(restrictions) {
+      _restrictions(restrictions),
+      _result(nullptr) {
   // prevent the collection from being unloaded while the export is ongoing
   // this may throw
   _guard.reset(new arangodb::CollectionGuard(vocbase, _name.c_str(), false));

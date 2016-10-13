@@ -611,13 +611,17 @@ std::vector<std::string> Transaction::collectionNames() const {
   return result;
 }
   
+ManagedMultiDocumentResult* Transaction::documentResult(LogicalCollection* collection) {
+  return _transactionContextPtr->documentResult(collection, this);
+}
+  
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief return the collection name resolver
 ////////////////////////////////////////////////////////////////////////////////
 
 CollectionNameResolver const* Transaction::resolver() {
   if (_resolver == nullptr) {
-    _resolver = _transactionContext->getResolver();
+    _resolver = _transactionContextPtr->getResolver();
     TRI_ASSERT(_resolver != nullptr);
   }
   return _resolver;
@@ -1283,14 +1287,15 @@ OperationResult Transaction::anyLocal(std::string const& collectionName,
 
   LogicalCollection* collection = cursor->collection();
   std::vector<IndexLookupResult> result;
-  ManagedMultiDocumentResult mmdr; // TODO
+  ManagedMultiDocumentResult* mmdr = documentResult(documentCollection(cid)); // TODO
+  
   while (cursor->hasMore()) {
     result.clear();
     cursor->getMoreMptr(result);
     for (auto const& element : result) {
       TRI_voc_rid_t revisionId = element.revisionId();
-      if (collection->readRevision(this, mmdr, revisionId)) {
-        uint8_t const* vpack = mmdr.back();
+      if (collection->readRevision(this, *mmdr, revisionId)) {
+        uint8_t const* vpack = mmdr->back();
         resultBuilder.add(VPackSlice(vpack));
       }
     }
@@ -1464,7 +1469,7 @@ int Transaction::documentFastPath(std::string const& collectionName,
     return TRI_ERROR_ARANGO_DOCUMENT_HANDLE_BAD;
   }
 
-  ManagedDocumentResult doc;
+  ManagedDocumentResult doc(this);
   int res = collection->read(this, key, doc,
       shouldLock && !isLocked(collection, TRI_TRANSACTION_READ));
 
@@ -1695,7 +1700,7 @@ OperationResult Transaction::documentLocal(std::string const& collectionName,
     
     TIMER_STOP(TRANSACTION_DOCUMENT_EXTRACT);
 
-    ManagedDocumentResult result;
+    ManagedDocumentResult result(this);
     TIMER_START(TRANSACTION_DOCUMENT_DOCUMENT_DOCUMENT);
     int res = collection->read(this, key, result,
                                !isLocked(collection, TRI_TRANSACTION_READ));
@@ -1844,7 +1849,7 @@ OperationResult Transaction::insertLocal(std::string const& collectionName,
       return TRI_ERROR_ARANGO_DOCUMENT_TYPE_INVALID;
     }
 
-    ManagedDocumentResult result;
+    ManagedDocumentResult result(this);
     TRI_voc_tick_t resultMarkerTick = 0;
 
     TIMER_START(TRANSACTION_INSERT_DOCUMENT_INSERT);
@@ -2157,9 +2162,10 @@ OperationResult Transaction::modifyLocal(
     if (!newVal.isObject()) {
       return TRI_ERROR_ARANGO_DOCUMENT_TYPE_INVALID;
     }
-    ManagedDocumentResult result;
+    
+    ManagedDocumentResult result(this);
     TRI_voc_rid_t actualRevision = 0;
-    ManagedDocumentResult previous;
+    ManagedDocumentResult previous(this);
     TRI_voc_tick_t resultMarkerTick = 0;
 
     if (operation == TRI_VOC_DOCUMENT_OPERATION_REPLACE) {
@@ -2401,7 +2407,7 @@ OperationResult Transaction::removeLocal(std::string const& collectionName,
 
   auto workOnOneDocument = [&](VPackSlice value, bool isBabies) -> int {
     TRI_voc_rid_t actualRevision = 0;
-    ManagedDocumentResult previous;
+    ManagedDocumentResult previous(this);
     TransactionBuilderLeaser builder(this);
     StringRef key;
     if (value.isString()) {
@@ -2622,13 +2628,14 @@ OperationResult Transaction::allLocal(std::string const& collectionName,
   LogicalCollection* collection = cursor->collection();
   std::vector<IndexLookupResult> result;
   result.reserve(1000);
-  ManagedMultiDocumentResult mmdr; // TODO
+  ManagedMultiDocumentResult* mmdr = documentResult(documentCollection(cid)); // TODO
+  
   while (cursor->hasMore()) {
     cursor->getMoreMptr(result, 1000);
     for (auto const& element : result) {
       TRI_voc_rid_t revisionId = element.revisionId();
-      if (collection->readRevision(this, mmdr, revisionId)) {
-        uint8_t const* vpack = mmdr.back();
+      if (collection->readRevision(this, *mmdr, revisionId)) {
+        uint8_t const* vpack = mmdr->back();
         resultBuilder.addExternal(vpack);
       }
     }
@@ -2703,12 +2710,12 @@ OperationResult Transaction::truncateLocal(std::string const& collectionName,
   options.ignoreRevs = true;
  
   TRI_voc_tick_t resultMarkerTick = 0;
-  ManagedMultiDocumentResult mmdr; // TODO
+  ManagedMultiDocumentResult* mmdr = documentResult(documentCollection(cid)); // TODO
 
   auto callback = [&](SimpleIndexElement const& element) {
     TRI_voc_rid_t revisionId = element.revisionId();
-    if (collection->readRevision(this, mmdr, revisionId)) {
-      uint8_t const* vpack = mmdr.back();
+    if (collection->readRevision(this, *mmdr, revisionId)) {
+      uint8_t const* vpack = mmdr->back();
       int res =
           collection->remove(this, revisionId, VPackSlice(vpack), options,
                              resultMarkerTick, false);

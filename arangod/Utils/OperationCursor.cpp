@@ -75,7 +75,7 @@ void OperationCursor::getMore(std::shared_ptr<OperationResult>& opRes,
  
   LogicalCollection* collection = _indexIterator->collection(); 
   Transaction* trx = _indexIterator->transaction();
-  ManagedMultiDocumentResult mmdr; // TODO 
+  ManagedMultiDocumentResult mmdr(trx); // TODO 
   VPackBuilder builder(opRes->buffer);
   builder.clear();
   try {

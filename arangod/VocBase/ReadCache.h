@@ -189,8 +189,11 @@ class ReadCache {
 
   void closeWriteChunk();
 
-  ChunkProtector readAndLease(RevisionCacheEntry const&);
-  ChunkProtector insertAndLease(TRI_voc_rid_t revisionId, uint8_t const* vpack);
+  template<typename T>
+  ChunkProtector readAndLease(RevisionCacheEntry const&, T& result);
+
+  template<typename T>
+  ChunkProtector insertAndLease(TRI_voc_rid_t revisionId, uint8_t const* vpack, T& result);
 
  private:
   RevisionCacheChunkAllocator* _allocator;

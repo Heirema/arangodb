@@ -95,39 +95,42 @@ void CollectionRevisionsCache::clear() {
 template<typename T>
 bool CollectionRevisionsCache::lookupRevision(Transaction* trx, T& result, TRI_voc_rid_t revisionId) {
   TRI_ASSERT(revisionId != 0);
+  
+  if (result.lastRevisionId() == revisionId) {
+    return result.lastVPack();
+  }
 
   READ_LOCKER(locker, _lock);
   
   RevisionCacheEntry found = _revisions.findByKey(nullptr, &revisionId);
-  locker.unlock();
 
   if (found) {
     TRI_ASSERT(found.revisionId != 0);
     // revision found in hash table
     if (found.isWal()) {
+      locker.unlock();
       // document is still in WAL
       // TODO: handle WAL reference counters
       wal::Logfile* logfile = found.logfile();
       // now move it into read cache
-      ChunkProtector status = _readCache.insertAndLease(revisionId, reinterpret_cast<uint8_t const*>(logfile->data() + found.offset()));
+      ChunkProtector protector = _readCache.insertAndLease(revisionId, reinterpret_cast<uint8_t const*>(logfile->data() + found.offset()), result);
       // must have succeeded (otherwise an exception was thrown)
       // and insert result into the hash
-      insertRevision(revisionId, status.chunk(), status.offset(), status.version());
+      insertRevision(revisionId, protector.chunk(), protector.offset(), protector.version());
       // TODO: handle WAL reference counters
-      result.add(std::move(status), trx);
       return true;
     } 
 
     // document is not in WAL but already in read cache
-    ChunkProtector status = _readCache.readAndLease(found);
-    if (status) {
+    ChunkProtector protector = _readCache.readAndLease(found, result);
+    if (protector) {
       // found in read cache, and still valid
-      result.add(std::move(status), trx);
       return true;
     }
   }
-
+      
   // either revision was not in hash or it was in hash but outdated
+  locker.unlock();
 
   // fetch document from engine
   uint8_t const* vpack = readFromEngine(revisionId);
@@ -136,10 +139,9 @@ bool CollectionRevisionsCache::lookupRevision(Transaction* trx, T& result, TRI_v
     return false;
   }
   // insert found revision into our hash
-  ChunkProtector status = _readCache.insertAndLease(revisionId, vpack);
+  ChunkProtector protector = _readCache.insertAndLease(revisionId, vpack, result);
   // insert result into the hash
-  insertRevision(revisionId, status.chunk(), status.offset(), status.version());
-  result.add(std::move(status), trx);
+  insertRevision(revisionId, protector.chunk(), protector.offset(), protector.version());
   return true;
 }
 
@@ -153,15 +155,15 @@ bool CollectionRevisionsCache::lookupRevision<ManagedMultiDocumentResult>(Transa
 bool CollectionRevisionsCache::lookupRevisionConditional(Transaction* trx, ManagedMultiDocumentResult& result, TRI_voc_rid_t revisionId, TRI_voc_tick_t maxTick, bool excludeWal) {
   // fetch document from engine
   uint8_t const* vpack = readFromEngineConditional(revisionId, maxTick, excludeWal);
+
   if (vpack == nullptr) {
     // engine could not provide the revision
     return false;
   }
   // insert found revision into our hash
-  ChunkProtector status = _readCache.insertAndLease(revisionId, vpack);
+  ChunkProtector protector = _readCache.insertAndLease(revisionId, vpack, result);
   // insert result into the hash
-  insertRevision(revisionId, status.chunk(), status.offset(), status.version());
-  result.add(std::move(status), trx);
+  insertRevision(revisionId, protector.chunk(), protector.offset(), protector.version());
   return true;
 }
   
@@ -174,6 +176,7 @@ void CollectionRevisionsCache::insertRevision(TRI_voc_rid_t revisionId, Revision
 
   WRITE_LOCKER(locker, _lock);
   int res = _revisions.insert(nullptr, RevisionCacheEntry(revisionId, chunk, offset, version));
+
   if (res != TRI_ERROR_NO_ERROR) {
     _revisions.removeByKey(nullptr, &revisionId);
     // try again
@@ -186,6 +189,7 @@ void CollectionRevisionsCache::insertRevision(TRI_voc_rid_t revisionId, wal::Log
   TRI_ASSERT(false);
   WRITE_LOCKER(locker, _lock);
   int res = _revisions.insert(nullptr, RevisionCacheEntry(revisionId, logfile, offset));
+
   if (res != TRI_ERROR_NO_ERROR) {
     _revisions.removeByKey(nullptr, &revisionId);
     _revisions.insert(nullptr, RevisionCacheEntry(revisionId, logfile, offset));

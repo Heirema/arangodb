@@ -32,12 +32,13 @@ class Transaction;
 
 class ManagedDocumentResult {
  public:
-  ManagedDocumentResult();
+  ManagedDocumentResult() = delete;
   ManagedDocumentResult(ManagedDocumentResult const& other) = delete;
   ManagedDocumentResult(ManagedDocumentResult&& other) = delete;
   ManagedDocumentResult& operator=(ManagedDocumentResult const& other);
   ManagedDocumentResult& operator=(ManagedDocumentResult&& other) = delete;
 
+  explicit ManagedDocumentResult(Transaction*);
   ~ManagedDocumentResult();
 
   inline uint8_t const* vpack() const { 
@@ -45,23 +46,29 @@ class ManagedDocumentResult {
     return _vpack; 
   }
   
-  void add(ChunkProtector&& protector, arangodb::Transaction* trx);
+  void add(ChunkProtector& protector, TRI_voc_rid_t revisionId);
+
+  TRI_voc_rid_t lastRevisionId() const { return _lastRevisionId; }
+  uint8_t const* lastVPack() const { return _vpack; }
 
   //void clear();
 
  private:
+  Transaction* _trx;
   RevisionCacheChunk* _chunk;
   uint8_t const* _vpack;
+  TRI_voc_rid_t _lastRevisionId;
 };
 
 class ManagedMultiDocumentResult {
  public:
-  ManagedMultiDocumentResult();
+  ManagedMultiDocumentResult() = delete;
   ManagedMultiDocumentResult(ManagedMultiDocumentResult const& other) = delete;
   ManagedMultiDocumentResult(ManagedMultiDocumentResult&& other) = delete;
   ManagedMultiDocumentResult& operator=(ManagedMultiDocumentResult const& other) = delete;
   ManagedMultiDocumentResult& operator=(ManagedMultiDocumentResult&& other) = delete;
 
+  explicit ManagedMultiDocumentResult(Transaction*);
   ~ManagedMultiDocumentResult();
 
   inline uint8_t const* at(size_t position) const {
@@ -74,7 +81,7 @@ class ManagedMultiDocumentResult {
   
   bool empty() const { return _results.empty(); }
   size_t size() const { return _results.size(); }
-  void clear() { _results.clear(); }
+  void clear() { _results.clear(); _lastRevisionId = 0; }
   void reserve(size_t size) { _results.reserve(size); }
   uint8_t const*& back() { return _results.back(); }
   uint8_t const* const& back() const { return _results.back(); }
@@ -82,11 +89,21 @@ class ManagedMultiDocumentResult {
   std::vector<uint8_t const*>::iterator begin() { return _results.begin(); }
   std::vector<uint8_t const*>::iterator end() { return _results.end(); }
   
-  void add(ChunkProtector&& protector, arangodb::Transaction* trx);
+  void add(ChunkProtector& protector, TRI_voc_rid_t revisionId);
+  
+  TRI_voc_rid_t lastRevisionId() const { return _lastRevisionId; }
+  uint8_t const* lastVPack() const { return _results.back(); }
+  
+  inline uint8_t const* vpack() const { 
+    TRI_ASSERT(!_results.empty());
+    return _results.back();
+  }
  
  private:
+  Transaction* _trx;
   std::unordered_set<RevisionCacheChunk*> _chunks;
   std::vector<uint8_t const*> _results;
+  TRI_voc_rid_t _lastRevisionId;
 };
 
 }

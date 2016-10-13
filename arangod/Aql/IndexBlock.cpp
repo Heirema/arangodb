@@ -393,7 +393,7 @@ bool IndexBlock::readIndex(size_t atMost) {
       THROW_ARANGO_EXCEPTION(TRI_ERROR_DEBUG);
     }
       
-    ManagedMultiDocumentResult mmdr;
+    ManagedMultiDocumentResult mmdr(_trx);
 
     if (hasMultipleIndexes) {
       for (auto const& element : _result) {

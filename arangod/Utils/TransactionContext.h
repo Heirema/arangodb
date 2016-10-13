@@ -46,7 +46,9 @@ struct CustomTypeHandler;
 class CollectionNameResolver;
 class DocumentDitch;
 class LogicalCollection;
+class ManagedMultiDocumentResult;
 class RevisionCacheChunk;
+class Transaction;
 
 class TransactionContext {
  public:
@@ -97,6 +99,8 @@ class TransactionContext {
   //////////////////////////////////////////////////////////////////////////////
   
   DocumentDitch* ditch(TRI_voc_cid_t) const;
+
+  ManagedMultiDocumentResult* documentResult(arangodb::LogicalCollection*, arangodb::Transaction*);
 
   void addChunk(RevisionCacheChunk*);
 
@@ -195,6 +199,7 @@ class TransactionContext {
   
   std::shared_ptr<velocypack::CustomTypeHandler> _customTypeHandler;
   
+  std::unordered_map<TRI_voc_cid_t, ManagedMultiDocumentResult*> _documentResults;
   std::unordered_map<TRI_voc_cid_t, DocumentDitch*> _ditches;
   
   std::unordered_set<RevisionCacheChunk*> _chunks;

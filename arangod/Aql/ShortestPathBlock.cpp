@@ -94,7 +94,7 @@ struct ConstDistanceExpanderLocal {
       // has to stay intact.
       _cursor.clear();
       LogicalCollection* collection = edgeCursor->collection();
-      ManagedMultiDocumentResult mmdr;
+      ManagedMultiDocumentResult mmdr(_block->transaction());
       while (edgeCursor->hasMore()) {
         edgeCursor->getMoreMptr(_cursor, UINT64_MAX);
         for (auto const& element : _cursor) {
@@ -237,7 +237,7 @@ struct EdgeWeightExpanderLocal {
       // next edge cursor.
       // While iterating over the edge cursor, _cursor
       // has to stay intact.
-      ManagedMultiDocumentResult mmdr;
+      ManagedMultiDocumentResult mmdr(_block->transaction());
       cursor.clear();
       LogicalCollection* collection = edgeCursor->collection();
       while (edgeCursor->hasMore()) {

@@ -67,17 +67,32 @@ void ReadCache::closeWriteChunk() {
   }
 }
 
-ChunkProtector ReadCache::readAndLease(RevisionCacheEntry const& entry) {
-  return ChunkProtector(entry.chunk(), entry.offset(), entry.version());
+template<typename T>
+ChunkProtector ReadCache::readAndLease(RevisionCacheEntry const& entry, T& result) {
+  ChunkProtector p(entry.chunk(), entry.offset(), entry.version());
+  
+  if (p) {
+    result.add(p, entry.revisionId);
+  }
+
+  return p;
 }
 
-ChunkProtector ReadCache::insertAndLease(TRI_voc_rid_t revisionId, uint8_t const* vpack) {
+// template instanciations
+template
+ChunkProtector ReadCache::readAndLease<ManagedDocumentResult>(RevisionCacheEntry const& entry, ManagedDocumentResult& result);
+
+template
+ChunkProtector ReadCache::readAndLease<ManagedMultiDocumentResult>(RevisionCacheEntry const& entry, ManagedMultiDocumentResult& result);
+
+template<typename T>
+ChunkProtector ReadCache::insertAndLease(TRI_voc_rid_t revisionId, uint8_t const* vpack, T& result) {
   TRI_ASSERT(revisionId != 0);
   TRI_ASSERT(vpack != nullptr);
 
   uint32_t const size = static_cast<uint32_t>(VPackSlice(vpack).byteSize());
 
-  ChunkProtector result;
+  ChunkProtector p;
 
   while (true) { 
     RevisionCacheChunk* returnChunk = nullptr;
@@ -94,14 +109,14 @@ ChunkProtector ReadCache::insertAndLease(TRI_voc_rid_t revisionId, uint8_t const
       
       uint32_t version = _writeChunk->version();
       TRI_ASSERT(version != 0);
-      result = ChunkProtector(_writeChunk, _writeChunk->advanceWritePosition(size), version);
+      p = ChunkProtector(_writeChunk, _writeChunk->advanceWritePosition(size), version);
 
-      if (!result) {
+      if (!p) {
         // chunk was full
         returnChunk = _writeChunk; // save _writeChunk value
         _writeChunk = nullptr; // reset _writeChunk and try again
       } else {
-        TRI_ASSERT(result.version() != 0);
+        TRI_ASSERT(p.version() != 0);
       } 
     }
       
@@ -109,14 +124,20 @@ ChunkProtector ReadCache::insertAndLease(TRI_voc_rid_t revisionId, uint8_t const
     
     if (returnChunk != nullptr) {
       _allocator->returnUsed(this, returnChunk);
-    } else if (result) {
+    } else if (p) {
       // we got a free slot in the chunk. copy data and return target position
-      TRI_ASSERT(result.version() != 0);
-      memcpy(result.vpack(), vpack, size); 
-      return result;
+      TRI_ASSERT(p.version() != 0);
+      memcpy(p.vpack(), vpack, size); 
+      result.add(p, revisionId);
+      return p;
     }
     
     // try again
   }
 }
 
+template
+ChunkProtector ReadCache::insertAndLease<ManagedDocumentResult>(TRI_voc_rid_t revisionId, uint8_t const* vpack, ManagedDocumentResult& result);
+
+template
+ChunkProtector ReadCache::insertAndLease<ManagedMultiDocumentResult>(TRI_voc_rid_t revisionId, uint8_t const* vpack, ManagedMultiDocumentResult& result);

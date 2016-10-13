@@ -47,9 +47,9 @@ class IndexLookupContext {
 
   uint8_t const* lookup(TRI_voc_rid_t revisionId) {
     try {
-      ManagedDocumentResult result; // TODO
-      if (_collection->readRevision(_trx, result, revisionId)) {
-        return result.vpack();
+      ManagedMultiDocumentResult* result = _trx->documentResult(_collection);
+      if (_collection->readRevision(_trx, *result, revisionId)) {
+        return result->vpack();
       } 
     } catch (...) {
     }

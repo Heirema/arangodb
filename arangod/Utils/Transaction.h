@@ -56,6 +56,7 @@ class Builder;
 
 class Index;
 class ManagedDocumentResult;
+class ManagedMultiDocumentResult;
 class RevisionCacheChunk;
 
 namespace aql {
@@ -173,7 +174,7 @@ class Transaction {
   //////////////////////////////////////////////////////////////////////////////
   /// @brief return role of server in cluster
   //////////////////////////////////////////////////////////////////////////////
-  
+
   inline ServerState::RoleEnum serverRole() const { return _serverRole; }
   
   bool isCluster();
@@ -191,6 +192,8 @@ class Transaction {
   inline TransactionContext* transactionContextPtr() const {
     return _transactionContextPtr;
   }
+  
+  ManagedMultiDocumentResult* documentResult(LogicalCollection*);
 
   //////////////////////////////////////////////////////////////////////////////
   /// @brief get (or create) a rocksdb WriteTransaction

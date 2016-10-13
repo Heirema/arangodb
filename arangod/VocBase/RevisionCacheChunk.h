@@ -57,6 +57,7 @@ class ChunkProtector {
   RevisionCacheChunk* _chunk;
   uint32_t _offset;
   uint32_t _version;
+  bool _isResponsible;
 };
 
 

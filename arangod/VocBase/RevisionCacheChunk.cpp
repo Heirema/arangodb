@@ -29,47 +29,55 @@
 using namespace arangodb;
 
 /// @brief create an empty usage object, pointing to nothing
-ChunkProtector::ChunkProtector() : _chunk(nullptr), _offset(UINT32_MAX), _version(UINT32_MAX) {}
+ChunkProtector::ChunkProtector() 
+    : _chunk(nullptr), _offset(UINT32_MAX), _version(UINT32_MAX), _isResponsible(false) {}
 
 /// @brief create a valid usage object, pointing to vpack in the read cache
 ChunkProtector::ChunkProtector(RevisionCacheChunk* chunk, uint32_t offset, uint32_t expectedVersion) 
-        : _chunk(chunk), _offset(offset), _version(expectedVersion) {
+        : _chunk(chunk), _offset(offset), _version(expectedVersion), _isResponsible(true) {
   TRI_ASSERT(_chunk != nullptr);
  
   if (offset == UINT32_MAX) {
     // chunk was full
     _chunk = nullptr;
+    _isResponsible = false;
   } else if (!_chunk->use(expectedVersion)) {
     // invalid
     _chunk = nullptr;
+    _isResponsible = false;
   }
 }
 
 ChunkProtector::~ChunkProtector() {
-  if (_chunk != nullptr) {
+  if (_chunk != nullptr && _isResponsible) {
+    _isResponsible = false;
     _chunk->release();
   }
 }
 
-ChunkProtector::ChunkProtector(ChunkProtector&& other) : _chunk(other._chunk), _offset(other._offset), _version(other._version) {
+ChunkProtector::ChunkProtector(ChunkProtector&& other) : _chunk(other._chunk), _offset(other._offset), _version(other._version), _isResponsible(other._isResponsible) {
   other._chunk = nullptr;
+  other._isResponsible = false;
 }
   
 ChunkProtector& ChunkProtector::operator=(ChunkProtector&& other) {
   if (_chunk != nullptr && _chunk != other._chunk) {
     _chunk->release();
     _chunk = nullptr;
+    _isResponsible = false;
   }
 
   _chunk = other._chunk;
   _offset = other._offset;
   _version = other._version;
+  _isResponsible = other._isResponsible;
   other._chunk = nullptr;
+  other._isResponsible = false;
   return *this;
 }
 
 void ChunkProtector::steal() {
-  _chunk = nullptr;
+  _isResponsible = false;
 }
   
 uint8_t* ChunkProtector::vpack() {

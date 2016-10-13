@@ -25,15 +25,15 @@
 #include "Utils/Transaction.h"
 
 using namespace arangodb;
-  
-ManagedDocumentResult::ManagedDocumentResult() 
-        : _chunk(nullptr), _vpack(nullptr) {}
+
+ManagedDocumentResult::ManagedDocumentResult(Transaction* trx) 
+        : _trx(trx), _chunk(nullptr), _vpack(nullptr), _lastRevisionId(0) {}
 
 ManagedDocumentResult::~ManagedDocumentResult() {
 //  clear();
 }
 
-void ManagedDocumentResult::add(ChunkProtector&& protector, Transaction* trx) {
+void ManagedDocumentResult::add(ChunkProtector& protector, TRI_voc_rid_t revisionId) {
   /*
   if (protector.chunk() != _chunk) {
     clear();
@@ -42,13 +42,12 @@ void ManagedDocumentResult::add(ChunkProtector&& protector, Transaction* trx) {
   _vpack = protector.vpack();
   _chunk = protector.chunk();
   */
-  uint8_t const* vpack = protector.vpack();
-  TRI_ASSERT(vpack != nullptr);
-
-  trx->addChunk(protector.chunk());
-  protector.steal();
-
-  _vpack = vpack;
+  if (_trx != nullptr) {
+    _trx->addChunk(protector.chunk());
+    protector.steal();
+  }
+  _vpack = protector.vpack();
+  _lastRevisionId = revisionId;
 }
 
 /*
@@ -63,14 +62,17 @@ void ManagedDocumentResult::clear() {
 ManagedDocumentResult& ManagedDocumentResult::operator=(ManagedDocumentResult const& other) {
   if (this != &other) {
   //  clear();
+    _trx = other._trx;
     _vpack = other._vpack;
     _chunk = other._chunk;
+    _lastRevisionId = 0; // clear cache
   //  _chunk->use();
   }
   return *this;
 }
 
-ManagedMultiDocumentResult::ManagedMultiDocumentResult() {} 
+ManagedMultiDocumentResult::ManagedMultiDocumentResult(Transaction* trx) 
+    : _trx(trx), _lastRevisionId(0) {} 
 
 ManagedMultiDocumentResult::~ManagedMultiDocumentResult() {
   /*
@@ -80,7 +82,7 @@ ManagedMultiDocumentResult::~ManagedMultiDocumentResult() {
   */
 }
   
-void ManagedMultiDocumentResult::add(ChunkProtector&& protector, Transaction* trx) {
+void ManagedMultiDocumentResult::add(ChunkProtector& protector, TRI_voc_rid_t revisionId) {
   /*
   RevisionCacheChunk* chunk = protector.chunk();
   uint8_t const* vpack = protector.vpack();
@@ -91,10 +93,11 @@ void ManagedMultiDocumentResult::add(ChunkProtector&& protector, Transaction* tr
     protector.steal();
   }
   */
-  uint8_t const* vpack = protector.vpack();
-  trx->addChunk(protector.chunk());
-  protector.steal();
-
-  _results.push_back(vpack);
+  if (_trx != nullptr) {
+    _trx->addChunk(protector.chunk());
+    protector.steal();
+  }
+  _results.push_back(protector.vpack());
+  _lastRevisionId = revisionId;
 }
 
