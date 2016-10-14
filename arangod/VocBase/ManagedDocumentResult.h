@@ -33,11 +33,11 @@ class Transaction;
 
 struct ChunkCache {
   static constexpr size_t STATIC_ARRAY_SIZE = 4;
+  size_t _chunksUsed;
   RevisionCacheChunk* _chunksArray[STATIC_ARRAY_SIZE];
   std::unordered_set<RevisionCacheChunk*> _chunksHash;
-  size_t _chunksUsed;
 
-  ChunkCache() : _chunksArray(), _chunksUsed(0) {}
+  ChunkCache() : _chunksUsed(0), _chunksArray() {}
 
   void add(RevisionCacheChunk* chunk) {
     if (_chunksUsed <= STATIC_ARRAY_SIZE) {
