@@ -1434,7 +1434,7 @@ bool AgencyComm::unlock(std::string const& key, VPackSlice const& slice,
 AgencyEndpoint* AgencyComm::popEndpoint(std::string const& endpoint) {
   unsigned long sleepTime = InitialSleepTime;
 
-  while (1) {
+  while (true) {
     {
       WRITE_LOCKER(writeLocker, AgencyComm::_globalLock);
 
@@ -1605,6 +1605,7 @@ AgencyCommResult AgencyComm::sendWithFailover(
       AgencyCommResult result;
       result._statusCode = 400;
       result._message = "No endpoints for agency found.";
+      LOG_TOPIC(ERR, Logger::AGENCYCOMM) << "No endpoints for agency found.";
       return result;
     }
   }
@@ -1621,6 +1622,11 @@ AgencyCommResult AgencyComm::sendWithFailover(
     AgencyEndpoint* agencyEndpoint = popEndpoint(forceEndpoint);
 
     TRI_ASSERT(agencyEndpoint != nullptr);
+
+    if (tries > 1) {  // not the first try
+      LOG_TOPIC(WARN, Logger::AGENCYCOMM) << "Retrying agency communication at "
+        << agencyEndpoint->_endpoint->specification() << " tries: " << tries;
+    }
 
     try {
       result =
@@ -1664,6 +1670,11 @@ AgencyCommResult AgencyComm::sendWithFailover(
 
       size_t const delim = endpoint.find('/', offset);
 
+      LOG_TOPIC(WARN, Logger::AGENCYCOMM) << "Got a redirect 307 from agency "
+        << "endpoint: " << agencyEndpoint->_endpoint->specification() 
+        << " location: " << result.location()
+        << " new forced endpoint: " << endpoint;
+
       if (delim == std::string::npos) {
         // invalid location header
         break;
@@ -1675,12 +1686,13 @@ AgencyCommResult AgencyComm::sendWithFailover(
       if (!AgencyComm::hasEndpoint(endpoint)) {
         AgencyComm::addEndpoint(endpoint, true);
 
-        LOG_TOPIC(DEBUG, Logger::AGENCYCOMM) << "adding agency-endpoint '"
-                                             << endpoint << "'";
+        LOG_TOPIC(WARN, Logger::AGENCYCOMM) << "adding agency-endpoint '"
+                                            << endpoint << "'";
 
         // re-check the new endpoint
         if (AgencyComm::hasEndpoint(endpoint)) {
           ++numEndpoints;
+          forceEndpoint = endpoint;
           continue;
         }
 
@@ -1715,6 +1727,13 @@ AgencyCommResult AgencyComm::sendWithFailover(
     }
 
     // otherwise, try next
+  }
+
+  if (!result.successful()) {
+    LOG_TOPIC(ERR, Logger::AGENCYCOMM) << "Unsuccessful AgencyComm: "
+      << "errorCode   : " << result.errorCode()
+      << "errorMessage: " << result.errorMessage()
+      << "errorDetails: " << result.errorDetails();
   }
 
   return result;
