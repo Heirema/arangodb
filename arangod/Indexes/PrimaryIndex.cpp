@@ -137,13 +137,11 @@ AllIndexIterator::AllIndexIterator(LogicalCollection* collection,
     : IndexIterator(collection, trx, index), _index(indexImpl), _reverse(reverse), _total(0) {}
 
 IndexLookupResult AllIndexIterator::next() {
-  ManagedDocumentResult result(_trx); 
-  IndexLookupContext context(_trx, _collection, &result, 1); 
   SimpleIndexElement element;
   if (_reverse) {
-    element = _index->findSequentialReverse(&context, _position);
+    element = _index->findSequentialReverse(&_context, _position);
   } else {
-    element = _index->findSequential(&context, _position, _total);
+    element = _index->findSequential(&_context, _position, _total);
   }
   if (element) {
     return IndexLookupResult(element.revisionId());
@@ -179,9 +177,7 @@ AnyIndexIterator::AnyIndexIterator(LogicalCollection* collection, arangodb::Tran
     : IndexIterator(collection, trx, index), _index(indexImpl), _step(0), _total(0) {}
 
 IndexLookupResult AnyIndexIterator::next() {
-  ManagedDocumentResult result(_trx); 
-  IndexLookupContext context(_trx, _collection, &result, 1); 
-  SimpleIndexElement element = _index->findRandom(&context, _initial, _position, _step, _total);
+  SimpleIndexElement element = _index->findRandom(&_context, _initial, _position, _step, _total);
   if (element) {
     return IndexLookupResult(element.revisionId());
   }

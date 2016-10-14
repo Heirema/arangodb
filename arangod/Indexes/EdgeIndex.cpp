@@ -149,17 +149,13 @@ IndexLookupResult EdgeIndexIterator::next() {
       if (tmp.isObject()) {
         tmp = tmp.get(StaticStrings::IndexEq);
       }
-      ManagedDocumentResult result(_trx); 
-      IndexLookupContext context(_trx, _collection, &result, 1); 
-      _index->lookupByKey(&context, &tmp, _buffer, _batchSize);
+      _index->lookupByKey(&_context, &tmp, _buffer, _batchSize);
     } else if (_posInBuffer >= _buffer.size()) {
       // We have to refill the buffer
       _buffer.clear();
 
       _posInBuffer = 0;
-      ManagedDocumentResult result(_trx); 
-      IndexLookupContext context(_trx, _collection, &result, 1); 
-      _index->lookupByKeyContinue(&context, _lastElement, _buffer, _batchSize);
+      _index->lookupByKeyContinue(&_context, _lastElement, _buffer, _batchSize);
     }
     
     if (_buffer.empty()) {
@@ -194,17 +190,13 @@ void EdgeIndexIterator::nextBabies(std::vector<IndexLookupResult>& buffer, size_
       if (tmp.isObject()) {
         tmp = tmp.get(StaticStrings::IndexEq);
       }
-      ManagedDocumentResult result(_trx); 
-      IndexLookupContext context(_trx, _collection, &result, 1); 
-      _index->lookupByKey(&context, &tmp, _buffer, atMost);
+      _index->lookupByKey(&_context, &tmp, _buffer, atMost);
       // fallthrough intentional
     } else {
       // Continue the lookup
       buffer.clear();
 
-      ManagedDocumentResult result(_trx); 
-      IndexLookupContext context(_trx, _collection, &result, 1); 
-      _index->lookupByKeyContinue(&context, _lastElement, _buffer, atMost);
+      _index->lookupByKeyContinue(&_context, _lastElement, _buffer, atMost);
     }
 
     for (auto& it : _buffer) {

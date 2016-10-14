@@ -669,12 +669,9 @@ void SkiplistIterator2::initNextInterval() {
   Node* rightBorder = nullptr;
   Node* leftBorder = nullptr;
   
-  ManagedDocumentResult result(_trx); 
-  IndexLookupContext context(_trx, _collection, &result, numPaths()); 
-
   while (true) {
     if (_builder->isEquality()) {
-      rightBorder = _skiplistIndex->rightKeyLookup(&context, _builder->getLowerLookup());
+      rightBorder = _skiplistIndex->rightKeyLookup(&_context, _builder->getLowerLookup());
       if (rightBorder == _skiplistIndex->startNode()) {
         // No matching elements. Next interval
         if (!_builder->next()) {
@@ -684,16 +681,16 @@ void SkiplistIterator2::initNextInterval() {
         // Builder moved forward. Try again.
         continue;
       }
-      leftBorder = _skiplistIndex->leftKeyLookup(&context, _builder->getLowerLookup());
+      leftBorder = _skiplistIndex->leftKeyLookup(&_context, _builder->getLowerLookup());
       leftBorder = leftBorder->nextNode();
       // NOTE: rightBorder < leftBorder => no Match.
       // Will be checked by interval valid
     } else {
       if (_builder->includeLower()) {
-        leftBorder = _skiplistIndex->leftKeyLookup(&context, _builder->getLowerLookup());
+        leftBorder = _skiplistIndex->leftKeyLookup(&_context, _builder->getLowerLookup());
         // leftKeyLookup guarantees that we find the element before search.
       } else {
-        leftBorder = _skiplistIndex->rightKeyLookup(&context, _builder->getLowerLookup());
+        leftBorder = _skiplistIndex->rightKeyLookup(&_context, _builder->getLowerLookup());
         // leftBorder is identical or smaller than search
       }
       // This is the first element not to be returned, but the next one
@@ -702,9 +699,9 @@ void SkiplistIterator2::initNextInterval() {
 
       if (_builder->includeUpper()) {
         rightBorder =
-            _skiplistIndex->rightKeyLookup(&context, _builder->getUpperLookup());
+            _skiplistIndex->rightKeyLookup(&_context, _builder->getUpperLookup());
       } else {
-        rightBorder = _skiplistIndex->leftKeyLookup(&context, _builder->getUpperLookup());
+        rightBorder = _skiplistIndex->leftKeyLookup(&_context, _builder->getUpperLookup());
       }
       if (rightBorder == _skiplistIndex->startNode()) {
         // No match make interval invalid
@@ -712,7 +709,7 @@ void SkiplistIterator2::initNextInterval() {
       }
       // else rightBorder is correct
     }
-    if (!intervalValid(&context, leftBorder, rightBorder)) {
+    if (!intervalValid(&_context, leftBorder, rightBorder)) {
       // No matching elements. Next interval
       if (!_builder->next()) {
         // No next interval. We are done.
