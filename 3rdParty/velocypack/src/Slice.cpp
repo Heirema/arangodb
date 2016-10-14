@@ -529,12 +529,7 @@ Slice Slice::get(std::string const& attribute) const {
 int64_t Slice::getInt() const {
   uint8_t const h = head();
 
-  if (h == 0x20) {
-    // single byte integer
-    return readIntegerFixed<int64_t, 1>(_start + 1);
-  }
-
-  if (h >= 0x21 && h <= 0x27) {
+  if (h >= 0x20 && h <= 0x27) {
     // Int  T
     uint64_t v = readIntegerNonEmpty<uint64_t>(_start + 1, h - 0x1f);
     if (h == 0x27) {
