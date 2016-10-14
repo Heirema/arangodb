@@ -32,12 +32,14 @@ using namespace arangodb;
 
 namespace {
 static inline uint64_t HashKey(void*, TRI_voc_rid_t const* key) {
-  return XXH64(key, sizeof(TRI_voc_rid_t), 0x12345678);
+  return std::hash<TRI_voc_rid_t>()(*key);
+//  return XXH64(key, sizeof(TRI_voc_rid_t), 0x12345678);
 }
 
 static inline uint64_t HashElement(void*, MMFilesDocumentPosition const& element) {
-  TRI_voc_rid_t revisionId = element.revisionId();
-  return HashKey(nullptr, &revisionId);
+  return std::hash<TRI_voc_rid_t>()(element.revisionId());
+//  TRI_voc_rid_t revisionId = element.revisionId();
+//  return HashKey(nullptr, &revisionId);
 }
 
 static bool IsEqualKeyElement(void*, TRI_voc_rid_t const* key,

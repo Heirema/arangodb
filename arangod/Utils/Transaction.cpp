@@ -611,10 +611,6 @@ std::vector<std::string> Transaction::collectionNames() const {
   return result;
 }
   
-ManagedMultiDocumentResult* Transaction::documentResult(LogicalCollection* collection) {
-  return _transactionContextPtr->documentResult(collection, this);
-}
-  
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief return the collection name resolver
 ////////////////////////////////////////////////////////////////////////////////
@@ -1287,15 +1283,15 @@ OperationResult Transaction::anyLocal(std::string const& collectionName,
 
   LogicalCollection* collection = cursor->collection();
   std::vector<IndexLookupResult> result;
-  ManagedMultiDocumentResult* mmdr = documentResult(documentCollection(cid)); // TODO
+  ManagedDocumentResult mmdr(this);
   
   while (cursor->hasMore()) {
     result.clear();
     cursor->getMoreMptr(result);
     for (auto const& element : result) {
       TRI_voc_rid_t revisionId = element.revisionId();
-      if (collection->readRevision(this, *mmdr, revisionId)) {
-        uint8_t const* vpack = mmdr->back();
+      if (collection->readRevision(this, mmdr, revisionId)) {
+        uint8_t const* vpack = mmdr.vpack();
         resultBuilder.add(VPackSlice(vpack));
       }
     }
@@ -2628,14 +2624,14 @@ OperationResult Transaction::allLocal(std::string const& collectionName,
   LogicalCollection* collection = cursor->collection();
   std::vector<IndexLookupResult> result;
   result.reserve(1000);
-  ManagedMultiDocumentResult* mmdr = documentResult(documentCollection(cid)); // TODO
+  ManagedDocumentResult mmdr(this);
   
   while (cursor->hasMore()) {
     cursor->getMoreMptr(result, 1000);
     for (auto const& element : result) {
       TRI_voc_rid_t revisionId = element.revisionId();
-      if (collection->readRevision(this, *mmdr, revisionId)) {
-        uint8_t const* vpack = mmdr->back();
+      if (collection->readRevision(this, mmdr, revisionId)) {
+        uint8_t const* vpack = mmdr.vpack();
         resultBuilder.addExternal(vpack);
       }
     }
@@ -2710,12 +2706,12 @@ OperationResult Transaction::truncateLocal(std::string const& collectionName,
   options.ignoreRevs = true;
  
   TRI_voc_tick_t resultMarkerTick = 0;
-  ManagedMultiDocumentResult* mmdr = documentResult(documentCollection(cid)); // TODO
+  ManagedDocumentResult mmdr(this);
 
   auto callback = [&](SimpleIndexElement const& element) {
     TRI_voc_rid_t revisionId = element.revisionId();
-    if (collection->readRevision(this, *mmdr, revisionId)) {
-      uint8_t const* vpack = mmdr->back();
+    if (collection->readRevision(this, mmdr, revisionId)) {
+      uint8_t const* vpack = mmdr.vpack();
       int res =
           collection->remove(this, revisionId, VPackSlice(vpack), options,
                              resultMarkerTick, false);
@@ -3191,6 +3187,11 @@ arangodb::LogicalCollection* Transaction::documentCollection(
   TRI_ASSERT(getStatus() == TRI_TRANSACTION_RUNNING);
   
   auto trxCollection = TRI_GetCollectionTransaction(_trx, cid, TRI_TRANSACTION_READ);
+  if (trxCollection == nullptr) {
+    THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "could not find collection");
+  }
+
+  TRI_ASSERT(trxCollection != nullptr);
   TRI_ASSERT(trxCollection->_collection != nullptr);
   return trxCollection->_collection;
 }

@@ -31,6 +31,7 @@
 #include "Indexes/IndexElement.h"
 
 namespace arangodb {
+class ManagedDocumentResult;
 struct OperationCursor;
 
 namespace velocypack {
@@ -152,6 +153,8 @@ class IndexBlock : public ExecutionBlock {
 
   /// @brief whether or not at least one expression uses v8
   bool _hasV8Expression;
+  
+  std::unique_ptr<ManagedDocumentResult> _mmdr;
 };
 
 }  // namespace arangodb::aql

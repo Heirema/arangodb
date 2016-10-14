@@ -134,6 +134,9 @@ void AllIndexIterator::nextBabies(std::vector<IndexLookupResult>& buffer, size_t
   size_t atMost = limit;
 
   buffer.clear();
+  if (atMost > 0) {
+    buffer.reserve(atMost);
+  }
 
   while (atMost > 0) {
     IndexLookupResult result = next();

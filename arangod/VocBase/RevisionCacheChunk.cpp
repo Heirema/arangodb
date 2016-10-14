@@ -48,9 +48,15 @@ ChunkProtector::ChunkProtector(RevisionCacheChunk* chunk, uint32_t offset, uint3
   }
 }
 
+/// @brief create a valid usage object, pointing to vpack in the read cache
+ChunkProtector::ChunkProtector(RevisionCacheChunk* chunk, uint32_t offset, uint32_t expectedVersion, bool) 
+        : _chunk(chunk), _offset(offset), _version(expectedVersion), _isResponsible(false) {
+  TRI_ASSERT(_chunk != nullptr);
+  TRI_ASSERT(_offset != UINT32_MAX);
+}
+
 ChunkProtector::~ChunkProtector() {
-  if (_chunk != nullptr && _isResponsible) {
-    _isResponsible = false;
+  if (_isResponsible) {
     _chunk->release();
   }
 }

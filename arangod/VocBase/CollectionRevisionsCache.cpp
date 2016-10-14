@@ -34,19 +34,17 @@ using namespace arangodb;
 
 namespace {
 static inline uint64_t HashKey(void*, TRI_voc_rid_t const* key) {
-  return XXH64(key, sizeof(TRI_voc_rid_t), 0x12345678);
+  return std::hash<TRI_voc_rid_t>()(*key);
+//  return XXH64(key, sizeof(TRI_voc_rid_t), 0x12345678);
 }
 
 static inline uint64_t HashElement(void*, RevisionCacheEntry const& element) {
-  return HashKey(nullptr, &element.revisionId);
+  return std::hash<TRI_voc_rid_t>()(element.revisionId);
+//  return HashKey(nullptr, &element.revisionId);
 }
 
 static bool IsEqualKeyElement(void*, TRI_voc_rid_t const* key,
                               uint64_t hash, RevisionCacheEntry const& element) {
-  if (hash != HashElement(nullptr, element)) {
-    return false;
-  }
-
   return *key == element.revisionId;
 }
 

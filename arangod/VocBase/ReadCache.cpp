@@ -69,9 +69,16 @@ void ReadCache::closeWriteChunk() {
 
 template<typename T>
 ChunkProtector ReadCache::readAndLease(RevisionCacheEntry const& entry, T& result) {
+  if (result.hasSeenChunk(entry.chunk()) && entry.offset() != UINT32_MAX) {
+    ChunkProtector p(entry.chunk(), entry.offset(), entry.version(), false);
+    result.addExisting(p, entry.revisionId);
+    return p;
+  }
+
   ChunkProtector p(entry.chunk(), entry.offset(), entry.version());
   
   if (p) {
+    // LOG(ERR) << (void*) &result << ", HAVE NOT SEEN CHUNK: " << entry.chunk() << ", OFFSET: " << entry.offset();
     result.add(p, entry.revisionId);
   }
 
@@ -128,7 +135,11 @@ ChunkProtector ReadCache::insertAndLease(TRI_voc_rid_t revisionId, uint8_t const
       // we got a free slot in the chunk. copy data and return target position
       TRI_ASSERT(p.version() != 0);
       memcpy(p.vpack(), vpack, size); 
-      result.add(p, revisionId);
+      if (result.hasSeenChunk(p.chunk())) {
+        result.addExisting(p, revisionId);
+      } else {
+        result.add(p, revisionId);
+      }
       return p;
     }
     

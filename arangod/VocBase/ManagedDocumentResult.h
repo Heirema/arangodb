@@ -30,6 +30,42 @@
 namespace arangodb {
 class Transaction;
 
+struct ChunkCache {
+  static constexpr size_t CACHE_SIZE = 4;
+  RevisionCacheChunk* _chunks[CACHE_SIZE];
+  size_t _chunksUsed;
+
+  ChunkCache() : _chunks(), _chunksUsed(0) {}
+
+  void add(RevisionCacheChunk* chunk) {
+    TRI_ASSERT(_chunksUsed <= CACHE_SIZE);
+    if (_chunksUsed > 0) {
+      size_t maxValue = _chunksUsed;
+      if (maxValue == CACHE_SIZE) {
+        --maxValue;
+      }
+      for (size_t i = maxValue; i > 0; --i) {
+        _chunks[i] = _chunks[i - 1];
+      }
+    }
+
+    _chunks[0] = chunk;
+    if (_chunksUsed < CACHE_SIZE) {
+      ++_chunksUsed;
+    }
+    TRI_ASSERT(_chunksUsed <= CACHE_SIZE);
+  }
+
+  bool contains(RevisionCacheChunk* chunk) const {
+    for (size_t i = 0; i < _chunksUsed; ++i) {
+      if (_chunks[i] == chunk) {
+        return true;
+      }
+    }
+    return false;
+  }
+};
+
 class ManagedDocumentResult {
  public:
   ManagedDocumentResult() = delete;
@@ -47,7 +83,9 @@ class ManagedDocumentResult {
   }
   
   void add(ChunkProtector& protector, TRI_voc_rid_t revisionId);
+  void addExisting(ChunkProtector& protector, TRI_voc_rid_t revisionId);
 
+  bool hasSeenChunk(RevisionCacheChunk* chunk) const { return _chunkCache.contains(chunk); }
   TRI_voc_rid_t lastRevisionId() const { return _lastRevisionId; }
   uint8_t const* lastVPack() const { return _vpack; }
 
@@ -55,9 +93,9 @@ class ManagedDocumentResult {
 
  private:
   Transaction* _trx;
-  RevisionCacheChunk* _chunk;
   uint8_t const* _vpack;
   TRI_voc_rid_t _lastRevisionId;
+  ChunkCache _chunkCache;
 };
 
 class ManagedMultiDocumentResult {
@@ -70,6 +108,8 @@ class ManagedMultiDocumentResult {
 
   explicit ManagedMultiDocumentResult(Transaction*);
   ~ManagedMultiDocumentResult();
+  
+  bool hasSeenChunk(RevisionCacheChunk* chunk) const { return _chunkCache.contains(chunk); }
 
   inline uint8_t const* at(size_t position) const {
     return _results.at(position); 
@@ -90,6 +130,7 @@ class ManagedMultiDocumentResult {
   std::vector<uint8_t const*>::iterator end() { return _results.end(); }
   
   void add(ChunkProtector& protector, TRI_voc_rid_t revisionId);
+  void addExisting(ChunkProtector& protector, TRI_voc_rid_t revisionId);
   
   TRI_voc_rid_t lastRevisionId() const { return _lastRevisionId; }
   uint8_t const* lastVPack() const { return _results.back(); }
@@ -101,9 +142,9 @@ class ManagedMultiDocumentResult {
  
  private:
   Transaction* _trx;
-  std::unordered_set<RevisionCacheChunk*> _chunks;
   std::vector<uint8_t const*> _results;
   TRI_voc_rid_t _lastRevisionId;
+  ChunkCache _chunkCache;
 };
 
 }

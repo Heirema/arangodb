@@ -32,6 +32,9 @@
 #include <velocypack/Slice.h>
 
 namespace arangodb {
+
+class ManagedDocumentResult;
+
 namespace aql {
 class AqlItemBlock;
 struct Collection;
@@ -83,6 +86,8 @@ class EnumerateCollectionBlock : public ExecutionBlock {
 
   /// @brief whether or not the enumerated documents need to be stored
   bool _mustStoreResult;
+    
+  std::unique_ptr<ManagedDocumentResult> _mmdr;
 };
 
 }  // namespace arangodb::aql

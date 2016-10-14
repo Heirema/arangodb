@@ -206,7 +206,9 @@ AqlItemBlock* EnumerateCollectionBlock::getSome(size_t,  // atLeast,
   auto col = _collection->getCollection();
   LogicalCollection* c = col.get();
 
-  ManagedMultiDocumentResult mmdr(_trx);
+  if (_mmdr == nullptr) {
+    _mmdr.reset(new ManagedDocumentResult(_trx));
+  }
 
   for (size_t j = 0; j < toSend; j++) {
     if (_mustStoreResult) {
@@ -214,8 +216,8 @@ AqlItemBlock* EnumerateCollectionBlock::getSome(size_t,  // atLeast,
       // we do not need to do a lookup in getPlanNode()->_registerPlan->varInfo,
       // but can just take cur->getNrRegs() as registerId:
       TRI_voc_rid_t revisionId = _documents[_position].revisionId();
-      if (c->readRevision(_trx, mmdr, revisionId)) {
-        uint8_t const* vpack = mmdr.back();
+      if (c->readRevision(_trx, *_mmdr, revisionId)) {
+        uint8_t const* vpack = _mmdr->vpack(); //back();
         res->setValue(j, static_cast<arangodb::aql::RegisterId>(curRegs), AqlValue(vpack, AqlValueFromManagedDocument()));
       }
       // No harm done, if the setValue throws!

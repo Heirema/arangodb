@@ -392,14 +392,16 @@ bool IndexBlock::readIndex(size_t atMost) {
     TRI_IF_FAILURE("IndexBlock::readIndex") {
       THROW_ARANGO_EXCEPTION(TRI_ERROR_DEBUG);
     }
-      
-    ManagedMultiDocumentResult mmdr(_trx);
+     
+    if (_mmdr == nullptr) {
+      _mmdr.reset(new ManagedDocumentResult(_trx));
+    }
 
     if (hasMultipleIndexes) {
       for (auto const& element : _result) {
         TRI_voc_rid_t revisionId = element.revisionId();
-        if (collection->readRevision(_trx, mmdr, revisionId)) {
-          uint8_t const* vpack = mmdr.back();
+        if (collection->readRevision(_trx, *_mmdr, revisionId)) {
+          uint8_t const* vpack = _mmdr->vpack(); //back();
           // uniqueness checks
           if (!isLastIndex) {
             // insert & check for duplicates in one go
@@ -417,8 +419,8 @@ bool IndexBlock::readIndex(size_t atMost) {
     } else {
       for (auto const& element : _result) {
         TRI_voc_rid_t revisionId = element.revisionId();
-        if (collection->readRevision(_trx, mmdr, revisionId)) {
-          uint8_t const* vpack = mmdr.back();
+        if (collection->readRevision(_trx, *_mmdr, revisionId)) {
+          uint8_t const* vpack = _mmdr->vpack(); //back();
           _documents.emplace_back(vpack);
         }
       } 

@@ -2653,7 +2653,7 @@ int LogicalCollection::fillIndexBatch(arangodb::Transaction* trx,
 
   int res = TRI_ERROR_NO_ERROR;
     
-  ManagedMultiDocumentResult* mmdr = trx->documentResult(trx->documentCollection(_cid)); // TODO
+  ManagedDocumentResult mmdr(trx);
 
   std::vector<std::pair<TRI_voc_rid_t, VPackSlice>> documents;
   documents.reserve(blockSize);
@@ -2671,11 +2671,11 @@ int LogicalCollection::fillIndexBatch(arangodb::Transaction* trx,
       
       TRI_voc_rid_t revisionId = element.revisionId();
 
-      if (readRevision(trx, *mmdr, revisionId)) {
-        uint8_t const* vpack = mmdr->back();
+      if (readRevision(trx, mmdr, revisionId)) {
+        uint8_t const* vpack = mmdr.vpack();
         TRI_ASSERT(vpack != nullptr);
         documents.emplace_back(std::make_pair(revisionId, VPackSlice(vpack)));
-        mmdr->clear();
+        //mmdr->clear();
       }
 
       if (documents.size() == blockSize) {

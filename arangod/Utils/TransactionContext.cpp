@@ -22,6 +22,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "TransactionContext.h"
+#include "Basics/MutexLocker.h"
 #include "Basics/StringBuffer.h"
 #include "Utils/CollectionNameResolver.h"
 #include "Utils/Transaction.h"
@@ -84,12 +85,11 @@ TransactionContext::TransactionContext(TRI_vocbase_t* vocbase)
 //////////////////////////////////////////////////////////////////////////////
 
 TransactionContext::~TransactionContext() {
-  for (auto& chunk : _chunks) {
-    chunk->release();
-  }
-
-  for (auto& it : _documentResults) {
-    delete it.second;
+  {
+    MUTEX_LOCKER(locker, _chunksLock);
+    for (auto& chunk : _chunks) {
+      chunk->release();
+    }
   }
 
   // unregister the transaction from the logfile manager
@@ -174,20 +174,11 @@ DocumentDitch* TransactionContext::ditch(TRI_voc_cid_t cid) const {
   return (*it).second;
 }
   
-ManagedMultiDocumentResult* TransactionContext::documentResult(LogicalCollection* collection, Transaction* trx) {
-  auto it = _documentResults.find(collection->cid());
-
-  if (it != _documentResults.end()) {
-    return (*it).second;
-  }
-
-  auto result = std::make_unique<ManagedMultiDocumentResult>(trx);
-  _documentResults.emplace(collection->cid(), result.get());
-  return result.release();
-}
-
 void TransactionContext::addChunk(RevisionCacheChunk* chunk) {
   TRI_ASSERT(chunk != nullptr);
+
+  MUTEX_LOCKER(locker, _chunksLock);
+
   auto it = _chunks.find(chunk);
   if (it == _chunks.end()) {
     // insert the chunk here

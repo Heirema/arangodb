@@ -22,18 +22,23 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "ManagedDocumentResult.h"
+#include "Logger/Logger.h"
 #include "Utils/Transaction.h"
 
 using namespace arangodb;
 
 ManagedDocumentResult::ManagedDocumentResult(Transaction* trx) 
-        : _trx(trx), _chunk(nullptr), _vpack(nullptr), _lastRevisionId(0) {}
+        : _trx(trx), _vpack(nullptr), _lastRevisionId(0) {}
 
 ManagedDocumentResult::~ManagedDocumentResult() {
 //  clear();
 }
-
+  
+//static std::atomic<uint64_t> ADDCALLS(0);
 void ManagedDocumentResult::add(ChunkProtector& protector, TRI_voc_rid_t revisionId) {
+//  if (++ADDCALLS % 10000 == 0) {
+//    LOG(ERR) << ADDCALLS.load() << " CALLS TO ADD";
+//  }
   /*
   if (protector.chunk() != _chunk) {
     clear();
@@ -46,6 +51,24 @@ void ManagedDocumentResult::add(ChunkProtector& protector, TRI_voc_rid_t revisio
     _trx->addChunk(protector.chunk());
     protector.steal();
   }
+  _vpack = protector.vpack();
+  _lastRevisionId = revisionId;
+  _chunkCache.add(protector.chunk());
+}
+
+//static std::atomic<uint64_t> ADDEXISTINGCALLS(0);
+void ManagedDocumentResult::addExisting(ChunkProtector& protector, TRI_voc_rid_t revisionId) {
+//  if (++ADDEXISTINGCALLS % 10000 == 0) {
+//    LOG(ERR) << ADDEXISTINGCALLS.load() << " CALLS TO ADDEXISTING";
+//  }
+  /*
+  if (protector.chunk() != _chunk) {
+    clear();
+  }
+  
+  _vpack = protector.vpack();
+  _chunk = protector.chunk();
+  */
   _vpack = protector.vpack();
   _lastRevisionId = revisionId;
 }
@@ -64,7 +87,7 @@ ManagedDocumentResult& ManagedDocumentResult::operator=(ManagedDocumentResult co
   //  clear();
     _trx = other._trx;
     _vpack = other._vpack;
-    _chunk = other._chunk;
+    _chunkCache = other._chunkCache;
     _lastRevisionId = 0; // clear cache
   //  _chunk->use();
   }
@@ -72,7 +95,7 @@ ManagedDocumentResult& ManagedDocumentResult::operator=(ManagedDocumentResult co
 }
 
 ManagedMultiDocumentResult::ManagedMultiDocumentResult(Transaction* trx) 
-    : _trx(trx), _lastRevisionId(0) {} 
+    : _trx(trx), _lastRevisionId(0) {} //_lastChunk(nullptr) {} 
 
 ManagedMultiDocumentResult::~ManagedMultiDocumentResult() {
   /*
@@ -99,5 +122,23 @@ void ManagedMultiDocumentResult::add(ChunkProtector& protector, TRI_voc_rid_t re
   }
   _results.push_back(protector.vpack());
   _lastRevisionId = revisionId;
+  // _lastChunk = protector.chunk();
+  _chunkCache.add(protector.chunk());
+}
+
+void ManagedMultiDocumentResult::addExisting(ChunkProtector& protector, TRI_voc_rid_t revisionId) {
+  /*
+  RevisionCacheChunk* chunk = protector.chunk();
+  uint8_t const* vpack = protector.vpack();
+
+  auto it = _chunks.find(chunk);
+  if (it == _chunks.end()) {
+    _chunks.emplace(chunk);
+    protector.steal();
+  }
+  */
+  _results.push_back(protector.vpack());
+  _lastRevisionId = revisionId;
+  // _lastChunk = protector.chunk();
 }
 

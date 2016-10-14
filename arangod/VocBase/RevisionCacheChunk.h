@@ -36,6 +36,7 @@ class ChunkProtector {
  public:
   ChunkProtector();
   ChunkProtector(RevisionCacheChunk* chunk, uint32_t offset, uint32_t expectedVersion);
+  ChunkProtector(RevisionCacheChunk* chunk, uint32_t offset, uint32_t expectedVersion, bool);
   ~ChunkProtector();
   
   ChunkProtector(ChunkProtector const& other) = delete;
@@ -43,7 +44,7 @@ class ChunkProtector {
   ChunkProtector& operator=(ChunkProtector const& other) = delete;
   ChunkProtector& operator=(ChunkProtector&& other);
 
-  inline operator bool() const { return _chunk != nullptr; }
+  inline operator bool() const { return _chunk != nullptr && _offset != UINT32_MAX; }
   
   void steal();
 

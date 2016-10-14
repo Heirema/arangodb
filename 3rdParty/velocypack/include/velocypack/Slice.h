@@ -895,8 +895,8 @@ class Slice {
                               ValueLength offsetSize, ValueLength n) const;
 
   // perform a binary search for the specified attribute inside an Object
-  Slice searchObjectKeyBinary(std::string const& attribute, ValueLength ieBase,
-                              ValueLength offsetSize, ValueLength n) const;
+  template<ValueLength offsetSize>
+  Slice searchObjectKeyBinary(std::string const& attribute, ValueLength ieBase, ValueLength n) const;
 
 // assert that the slice is of a specific type
 // can be used for debugging and removed in production
