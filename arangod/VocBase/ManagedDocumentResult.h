@@ -26,39 +26,56 @@
 
 #include "Basics/Common.h"
 #include "VocBase/RevisionCacheChunk.h"
+#include "Logger/Logger.h"
 
 namespace arangodb {
 class Transaction;
 
 struct ChunkCache {
-  static constexpr size_t CACHE_SIZE = 4;
-  RevisionCacheChunk* _chunks[CACHE_SIZE];
+  static constexpr size_t STATIC_ARRAY_SIZE = 4;
+  RevisionCacheChunk* _chunksArray[STATIC_ARRAY_SIZE];
+  std::unordered_set<RevisionCacheChunk*> _chunksHash;
   size_t _chunksUsed;
 
-  ChunkCache() : _chunks(), _chunksUsed(0) {}
+  ChunkCache() : _chunksArray(), _chunksUsed(0) {}
 
   void add(RevisionCacheChunk* chunk) {
-    TRI_ASSERT(_chunksUsed <= CACHE_SIZE);
-    if (_chunksUsed > 0) {
-      size_t maxValue = _chunksUsed;
-      if (maxValue == CACHE_SIZE) {
-        --maxValue;
-      }
-      for (size_t i = maxValue; i > 0; --i) {
-        _chunks[i] = _chunks[i - 1];
-      }
-    }
+    if (_chunksUsed <= STATIC_ARRAY_SIZE) {
+      if (_chunksUsed == STATIC_ARRAY_SIZE) {
+        // transition static array to an unordered_map
+        for (size_t i = 0; i < STATIC_ARRAY_SIZE; ++i) {
+          _chunksHash.emplace(_chunksArray[i]);
+        }
+        _chunksHash.emplace(chunk);
+      } else {
+        if (_chunksUsed > 0) {
+          TRI_ASSERT(_chunksUsed < STATIC_ARRAY_SIZE);
+          // move elements in array
+          for (size_t i = _chunksUsed; i > 0; --i) {
+            _chunksArray[i] = _chunksArray[i - 1];
+          }
+        }
 
-    _chunks[0] = chunk;
-    if (_chunksUsed < CACHE_SIZE) {
-      ++_chunksUsed;
+        // finally insert chunk at head of static array
+        _chunksArray[0] = chunk;
+      }
+    } else {
+      // insert chunk into map
+      _chunksHash.emplace(chunk);
     }
-    TRI_ASSERT(_chunksUsed <= CACHE_SIZE);
+    
+    ++_chunksUsed;
   }
 
   bool contains(RevisionCacheChunk* chunk) const {
+    if (_chunksUsed > STATIC_ARRAY_SIZE) {
+      // lookup chunk in map
+      return _chunksHash.find(chunk) != _chunksHash.end();
+    }
+
+    // look up chunk in static array
     for (size_t i = 0; i < _chunksUsed; ++i) {
-      if (_chunks[i] == chunk) {
+      if (_chunksArray[i] == chunk) {
         return true;
       }
     }
