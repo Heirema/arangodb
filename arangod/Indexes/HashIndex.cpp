@@ -781,17 +781,9 @@ int HashIndex::lookup(arangodb::Transaction* trx,
     return TRI_ERROR_NO_ERROR;
   }
 
-  // TODO: optimize this copying!
-  std::vector<HashIndexElement*> results;
+  documents.clear();
   try {
-    _multiArray->_hashArray->lookupByKey(&context, &key, results);
-  } catch (...) {
-    return TRI_ERROR_OUT_OF_MEMORY;
-  }
-  try {
-    for (size_t i = 0; i < results.size(); i++) {
-      documents.emplace_back(results[i]);
-    }
+    _multiArray->_hashArray->lookupByKey(&context, &key, documents);
   } catch (...) {
     return TRI_ERROR_OUT_OF_MEMORY;
   }
