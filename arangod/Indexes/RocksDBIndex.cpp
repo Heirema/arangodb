@@ -88,7 +88,7 @@ RocksDBIterator::RocksDBIterator(LogicalCollection* collection,
                                  bool reverse, 
                                  VPackSlice const& left,
                                  VPackSlice const& right)
-    : IndexIterator(collection, trx),
+    : IndexIterator(collection, trx, index),
       _primaryIndex(primaryIndex),
       _db(db),
       _reverse(reverse),
@@ -276,7 +276,8 @@ int RocksDBIndex::insert(arangodb::Transaction* trx, TRI_voc_rid_t revisionId,
     return res;
   }
   
-  IndexLookupContext context(trx, _collection, numPaths()); 
+  ManagedDocumentResult result(trx); 
+  IndexLookupContext context(trx, _collection, &result, numPaths()); 
   VPackSlice const key = Transaction::extractKeyFromDocument(doc);
   std::string const prefix =
       buildPrefix(trx->vocbase()->id(), _collection->cid(), _iid);
@@ -434,7 +435,8 @@ int RocksDBIndex::remove(arangodb::Transaction* trx, TRI_voc_rid_t revisionId,
     return res;
   }
   
-  IndexLookupContext context(trx, _collection, numPaths()); 
+  ManagedDocumentResult result(trx); 
+  IndexLookupContext context(trx, _collection, &result, numPaths()); 
   VPackSlice const key = Transaction::extractKeyFromDocument(doc);
   
   VPackBuilder builder;
@@ -1056,7 +1058,7 @@ IndexIterator* RocksDBIndex::iteratorForCondition(
       }
       throw; 
     }
-    return new MultiIndexIterator(_collection, trx, iterators);
+    return new MultiIndexIterator(_collection, trx, this, iterators);
   }
 
   VPackSlice searchSlice = searchValues.slice();

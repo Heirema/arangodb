@@ -35,6 +35,7 @@
 #include <velocypack/Slice.h>
 
 namespace arangodb {
+class EdgeIndex;
   
 typedef arangodb::basics::AssocMulti<arangodb::velocypack::Slice, SimpleIndexElement,
                                      uint32_t, false> TRI_EdgeIndexHash_t;
@@ -43,18 +44,9 @@ typedef arangodb::basics::AssocMulti<arangodb::velocypack::Slice, SimpleIndexEle
 class EdgeIndexIterator final : public IndexIterator {
  public:
   EdgeIndexIterator(LogicalCollection* collection, arangodb::Transaction* trx,
-                    TRI_EdgeIndexHash_t const* index,
-                    std::unique_ptr<VPackBuilder>& keys)
-      : IndexIterator(collection, trx),
-        _index(index),
-        _keys(keys.get()),
-        _iterator(_keys->slice()),
-        _posInBuffer(0),
-        _batchSize(1000),
-        _lastElement() {
-        
-    keys.release(); // now we have ownership for _keys
-  }
+                    arangodb::EdgeIndex const* index,
+                    TRI_EdgeIndexHash_t const* indexImpl,
+                    std::unique_ptr<VPackBuilder>& keys);
 
   ~EdgeIndexIterator();
   
@@ -80,12 +72,9 @@ class AnyDirectionEdgeIndexIterator final : public IndexIterator {
  public:
   AnyDirectionEdgeIndexIterator(LogicalCollection* collection,
                                 arangodb::Transaction* trx,
+                                arangodb::EdgeIndex const* index,
                                 EdgeIndexIterator* outboundIterator,
-                                EdgeIndexIterator* inboundIterator)
-      : IndexIterator(collection, trx),
-        _outbound(outboundIterator),
-        _inbound(inboundIterator),
-        _useInbound(false) {}
+                                EdgeIndexIterator* inboundIterator);
 
   ~AnyDirectionEdgeIndexIterator() {
     delete _outbound;

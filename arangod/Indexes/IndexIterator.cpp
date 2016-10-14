@@ -24,9 +24,16 @@
 #include "IndexIterator.h"
 #include "Basics/StringUtils.h"
 #include "Cluster/ServerState.h"
+#include "Indexes/Index.h"
 #include "Utils/CollectionNameResolver.h"
 
 using namespace arangodb;
+  
+IndexIterator::IndexIterator(LogicalCollection* collection, arangodb::Transaction* trx, arangodb::Index const* index)
+      : _collection(collection), _trx(trx), _mmdr(trx), _context(trx, collection, &_mmdr, index->fields().size()) {
+  TRI_ASSERT(_collection != nullptr);
+  TRI_ASSERT(_trx != nullptr);
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief default destructor. Does not free anything

@@ -503,6 +503,16 @@ void SkiplistInLookupBuilder::buildSearchValues() {
     _upperSlice = _lowerBuilder->slice();
   }
 }
+  
+SkiplistIterator::SkiplistIterator(LogicalCollection* collection, arangodb::Transaction* trx,
+                                   arangodb::SkiplistIndex const* index,
+                                   bool reverse, Node* left, Node* right)
+    : IndexIterator(collection, trx, index),
+      _reverse(reverse),
+      _leftEndPoint(left),
+      _rightEndPoint(right) {
+  reset(); // Initializes the cursor
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief Reset the cursor
@@ -542,6 +552,26 @@ IndexLookupResult SkiplistIterator::next() {
   TRI_ASSERT(tmp != nullptr);
   TRI_ASSERT(tmp->document() != nullptr);
   return IndexLookupResult(tmp->document()->revisionId());
+}
+  
+SkiplistIterator2::SkiplistIterator2(LogicalCollection* collection, arangodb::Transaction* trx,
+    arangodb::SkiplistIndex const* index,
+    TRI_Skiplist const* skiplist, size_t numPaths,
+    std::function<int(void*, SkiplistIndexElement const*, SkiplistIndexElement const*,
+                      arangodb::basics::SkipListCmpType)> const& CmpElmElm,
+    bool reverse, BaseSkiplistLookupBuilder* builder)
+    : IndexIterator(collection, trx, index),
+      _skiplistIndex(skiplist),
+      _numPaths(numPaths),
+      _reverse(reverse),
+      _cursor(nullptr),
+      _currentInterval(0),
+      _builder(builder),
+      _CmpElmElm(CmpElmElm) {
+  TRI_ASSERT(_builder != nullptr);
+  initNextInterval(); // Initializes the cursor
+  TRI_ASSERT((_intervals.empty() && _cursor == nullptr) ||
+             (!_intervals.empty() && _cursor != nullptr));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -639,7 +669,8 @@ void SkiplistIterator2::initNextInterval() {
   Node* rightBorder = nullptr;
   Node* leftBorder = nullptr;
   
-  IndexLookupContext context(_trx, _collection, numPaths()); 
+  ManagedDocumentResult result(_trx); 
+  IndexLookupContext context(_trx, _collection, &result, numPaths()); 
 
   while (true) {
     if (_builder->isEquality()) {
@@ -769,7 +800,8 @@ int SkiplistIndex::insert(arangodb::Transaction* trx, TRI_voc_rid_t revisionId,
     return res;
   }
   
-  IndexLookupContext context(trx, _collection, numPaths()); 
+  ManagedDocumentResult result(trx); 
+  IndexLookupContext context(trx, _collection, &result, numPaths()); 
 
   // insert into the index. the memory for the element will be owned or freed
   // by the index
@@ -822,7 +854,8 @@ int SkiplistIndex::remove(arangodb::Transaction* trx, TRI_voc_rid_t revisionId,
     return res;
   }
   
-  IndexLookupContext context(trx, _collection, numPaths()); 
+  ManagedDocumentResult result(trx); 
+  IndexLookupContext context(trx, _collection, &result, numPaths()); 
 
   // attempt the removal for skiplist indexes
   // ownership for the index element is transferred to the index
@@ -884,7 +917,8 @@ IndexIterator* SkiplistIndex::lookup(arangodb::Transaction* trx,
   TRI_ASSERT(searchValues.isArray());
   TRI_ASSERT(searchValues.length() <= _fields.size());
 
-  IndexLookupContext context(trx, _collection, numPaths()); 
+  ManagedDocumentResult result(trx); 
+  IndexLookupContext context(trx, _collection, &result, numPaths()); 
   TransactionBuilderLeaser leftSearch(trx);
 
   VPackSlice lastNonEq;
@@ -1000,11 +1034,11 @@ IndexIterator* SkiplistIndex::lookup(arangodb::Transaction* trx,
 
   // Check if the interval is valid and not empty
   if (intervalValid(&context, leftBorder, rightBorder)) {
-    return new SkiplistIterator(_collection, trx, reverse, leftBorder, rightBorder);
+    return new SkiplistIterator(_collection, trx, this, reverse, leftBorder, rightBorder);
   }
 
   // Creates an empty iterator
-  return new EmptyIndexIterator(_collection, trx);
+  return new EmptyIndexIterator(_collection, trx, this);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1409,7 +1443,7 @@ IndexIterator* SkiplistIndex::iteratorForCondition(
                                      // will have _fields many entries.
     TRI_ASSERT(mapping.size() == _fields.size());
     if (!findMatchingConditions(node, reference, mapping, usesIn)) {
-      return new EmptyIndexIterator(_collection, trx);
+      return new EmptyIndexIterator(_collection, trx, this);
     }
   } else {
     TRI_IF_FAILURE("SkiplistIndex::noSortIterator") {
@@ -1424,12 +1458,12 @@ IndexIterator* SkiplistIndex::iteratorForCondition(
   if (usesIn) {
     auto builder = std::make_unique<SkiplistInLookupBuilder>(
         trx, mapping, reference, reverse);
-    return new SkiplistIterator2(_collection, trx, _skiplistIndex, numPaths(), CmpElmElm, reverse,
+    return new SkiplistIterator2(_collection, trx, this, _skiplistIndex, numPaths(), CmpElmElm, reverse,
                                  builder.release());
   }
   auto builder =
       std::make_unique<SkiplistLookupBuilder>(trx, mapping, reference, reverse);
-  return new SkiplistIterator2(_collection, trx, _skiplistIndex, numPaths(), CmpElmElm, reverse,
+  return new SkiplistIterator2(_collection, trx, this, _skiplistIndex, numPaths(), CmpElmElm, reverse,
                                builder.release());
 }
 

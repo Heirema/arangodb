@@ -27,9 +27,12 @@
 #include "Basics/Common.h"
 #include "Cluster/ServerState.h"
 #include "Indexes/IndexElement.h"
+#include "Indexes/IndexLookupContext.h"
+#include "VocBase/ManagedDocumentResult.h"
 #include "VocBase/vocbase.h"
 
 namespace arangodb {
+class Index;
 class LogicalCollection;
 class Transaction;
 
@@ -44,11 +47,7 @@ class IndexIterator {
   IndexIterator& operator=(IndexIterator const&) = delete;
   IndexIterator() = delete;
 
-  IndexIterator(LogicalCollection* collection, arangodb::Transaction* trx)
-      : _collection(collection), _trx(trx) {
-    TRI_ASSERT(_collection != nullptr);
-    TRI_ASSERT(_trx != nullptr);
-  }
+  IndexIterator(LogicalCollection* collection, arangodb::Transaction* trx, arangodb::Index const* index);
 
   virtual ~IndexIterator();
 
@@ -68,6 +67,8 @@ class IndexIterator {
  protected:
   LogicalCollection* _collection;
   arangodb::Transaction* _trx;
+  ManagedDocumentResult _mmdr;
+  IndexLookupContext _context;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -76,8 +77,8 @@ class IndexIterator {
 
 class EmptyIndexIterator final : public IndexIterator {
   public:
-    EmptyIndexIterator(LogicalCollection* collection, arangodb::Transaction* trx) 
-        : IndexIterator(collection, trx) {}
+    EmptyIndexIterator(LogicalCollection* collection, arangodb::Transaction* trx, arangodb::Index const* index) 
+        : IndexIterator(collection, trx, index) {}
 
     ~EmptyIndexIterator() {}
 
@@ -106,8 +107,9 @@ class MultiIndexIterator final : public IndexIterator {
 
   public:
    MultiIndexIterator(LogicalCollection* collection, arangodb::Transaction* trx,
+                      arangodb::Index const* index,
                       std::vector<IndexIterator*> const& iterators)
-     : IndexIterator(collection, trx), _iterators(iterators), _currentIdx(0), _current(nullptr) {
+     : IndexIterator(collection, trx, index), _iterators(iterators), _currentIdx(0), _current(nullptr) {
        if (!_iterators.empty()) {
          _current = _iterators.at(0);
        }

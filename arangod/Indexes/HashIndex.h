@@ -79,7 +79,6 @@ class LookupBuilder {
 
    bool incrementInPosition();
    void buildNextSearchValue();
-
 };
 
 class HashIndexIterator final : public IndexIterator {
@@ -120,15 +119,7 @@ class HashIndexIteratorVPack final : public IndexIterator {
 
   HashIndexIteratorVPack(LogicalCollection* collection,
       arangodb::Transaction* trx, HashIndex const* index,
-      std::unique_ptr<arangodb::velocypack::Builder>& searchValues)
-      : IndexIterator(collection, trx),
-        _index(index),
-        _searchValues(searchValues.get()),
-        _iterator(_searchValues->slice()),
-        _buffer(),
-        _posInBuffer(0) {
-    searchValues.release(); // now we have ownership for searchValues
-  }
+      std::unique_ptr<arangodb::velocypack::Builder>& searchValues);
 
   ~HashIndexIteratorVPack();
   

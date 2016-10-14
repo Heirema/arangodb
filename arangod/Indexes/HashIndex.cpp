@@ -223,7 +223,7 @@ static bool IsEqualElementElementMulti(void* userData,
                                        HashIndexElement const* right) {
   TRI_ASSERT(left != nullptr);
   TRI_ASSERT(right != nullptr);
-  
+ 
   if (left->revisionId() != right->revisionId()) {
     return false;
   }
@@ -297,7 +297,7 @@ HashIndexIterator::HashIndexIterator(LogicalCollection* collection,
                                      HashIndex const* index,
                                      arangodb::aql::AstNode const* node,
                                      arangodb::aql::Variable const* reference)
-    : IndexIterator(collection, trx),
+    : IndexIterator(collection, trx, index),
       _index(index),
       _lookups(trx, node, reference, index->fields()),
       _buffer(),
@@ -371,6 +371,19 @@ void HashIndexIterator::reset() {
   _posInBuffer = 0;
   _lookups.reset();
   _index->lookup(_trx, _lookups.lookup(), _buffer);
+}
+  
+HashIndexIteratorVPack::HashIndexIteratorVPack(LogicalCollection* collection,
+                                               arangodb::Transaction* trx, 
+                                               HashIndex const* index,
+                                               std::unique_ptr<arangodb::velocypack::Builder>& searchValues)
+    : IndexIterator(collection, trx, index),
+      _index(index),
+      _searchValues(searchValues.get()),
+      _iterator(_searchValues->slice()),
+      _buffer(),
+      _posInBuffer(0) {
+  searchValues.release(); // now we have ownership for searchValues
 }
 
 HashIndexIteratorVPack::~HashIndexIteratorVPack() {
@@ -731,8 +744,9 @@ int HashIndex::sizeHint(arangodb::Transaction* trx, size_t size) {
     // than if the index would be fully populated
     size /= 5;
   }
-  
-  IndexLookupContext context(trx, _collection, numPaths());
+ 
+  ManagedDocumentResult result(trx); 
+  IndexLookupContext context(trx, _collection, &result, numPaths());
 
   if (_unique) {
     return _uniqueArray->_hashArray->resize(&context, size);
@@ -752,7 +766,8 @@ int HashIndex::lookup(arangodb::Transaction* trx,
     return TRI_ERROR_NO_ERROR;
   }
 
-  IndexLookupContext context(trx, _collection, numPaths()); 
+  ManagedDocumentResult result(trx); 
+  IndexLookupContext context(trx, _collection, &result, numPaths()); 
 
   if (_unique) {
     HashIndexElement* found =
@@ -797,7 +812,8 @@ int HashIndex::insertUnique(arangodb::Transaction* trx, TRI_voc_rid_t revisionId
     return res;
   }
       
-  IndexLookupContext context(trx, _collection, numPaths()); 
+  ManagedDocumentResult result(trx); 
+  IndexLookupContext context(trx, _collection, &result, numPaths()); 
 
   auto work =
       [this, &context](HashIndexElement* element, bool) -> int {
@@ -846,7 +862,8 @@ int HashIndex::batchInsertUnique(arangodb::Transaction* trx,
     return TRI_ERROR_NO_ERROR;
   }
   
-  IndexLookupContext context(trx, _collection, numPaths()); 
+  ManagedDocumentResult result(trx); 
+  IndexLookupContext context(trx, _collection, &result, numPaths()); 
   
   int res = _uniqueArray->_hashArray->batchInsert(&context, &elements, numThreads);
 
@@ -872,7 +889,8 @@ int HashIndex::insertMulti(arangodb::Transaction* trx, TRI_voc_rid_t revisionId,
     return res;
   }
   
-  IndexLookupContext context(trx, _collection, numPaths()); 
+  ManagedDocumentResult result(trx); 
+  IndexLookupContext context(trx, _collection, &result, numPaths()); 
 
   auto work = [this, &context](HashIndexElement*& element, bool) {
     TRI_IF_FAILURE("InsertHashIndex") {
@@ -943,7 +961,8 @@ int HashIndex::batchInsertMulti(arangodb::Transaction* trx,
     return TRI_ERROR_NO_ERROR;
   }
   
-  IndexLookupContext context(trx, _collection, numPaths()); 
+  ManagedDocumentResult result(trx); 
+  IndexLookupContext context(trx, _collection, &result, numPaths()); 
   return _multiArray->_hashArray->batchInsert(&context, &elements, numThreads);
 }
 
@@ -951,7 +970,8 @@ int HashIndex::removeUniqueElement(arangodb::Transaction* trx,
                                    HashIndexElement* element,
                                    bool isRollback) {
   TRI_IF_FAILURE("RemoveHashIndex") { return TRI_ERROR_DEBUG; }
-  IndexLookupContext context(trx, _collection, numPaths()); 
+  ManagedDocumentResult result(trx); 
+  IndexLookupContext context(trx, _collection, &result, numPaths()); 
   HashIndexElement* old = _uniqueArray->_hashArray->remove(&context, element);
 
   if (old == nullptr) {
@@ -970,7 +990,8 @@ int HashIndex::removeMultiElement(arangodb::Transaction* trx,
                                   HashIndexElement* element,
                                   bool isRollback) {
   TRI_IF_FAILURE("RemoveHashIndex") { return TRI_ERROR_DEBUG; }
-  IndexLookupContext context(trx, _collection, numPaths()); 
+  ManagedDocumentResult result(trx); 
+  IndexLookupContext context(trx, _collection, &result, numPaths()); 
   HashIndexElement* old = _multiArray->_hashArray->remove(&context, element);
 
   if (old == nullptr) {

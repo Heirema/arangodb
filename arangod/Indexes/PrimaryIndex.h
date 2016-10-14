@@ -47,15 +47,7 @@ class PrimaryIndexIterator final : public IndexIterator {
   PrimaryIndexIterator(LogicalCollection* collection,
                        arangodb::Transaction* trx, 
                        PrimaryIndex const* index,
-                       std::unique_ptr<VPackBuilder>& keys)
-      : IndexIterator(collection, trx),
-        _index(index), 
-        _keys(keys.get()), 
-        _iterator(_keys->slice()) {
-
-        keys.release(); // now we have ownership for _keys
-        TRI_ASSERT(_keys->slice().isArray());
-      }
+                       std::unique_ptr<VPackBuilder>& keys);
 
   ~PrimaryIndexIterator();
     
@@ -74,9 +66,10 @@ class PrimaryIndexIterator final : public IndexIterator {
 class AllIndexIterator final : public IndexIterator {
  public:
   AllIndexIterator(LogicalCollection* collection,
-                   arangodb::Transaction* trx, PrimaryIndexImpl const* index,
-                   bool reverse)
-      : IndexIterator(collection, trx), _index(index), _reverse(reverse), _total(0) {}
+                   arangodb::Transaction* trx, 
+                   PrimaryIndex const* index,
+                   PrimaryIndexImpl const* indexImpl,
+                   bool reverse);
 
   ~AllIndexIterator() {}
     
@@ -98,8 +91,8 @@ class AllIndexIterator final : public IndexIterator {
 class AnyIndexIterator final : public IndexIterator {
  public:
   AnyIndexIterator(LogicalCollection* collection, arangodb::Transaction* trx, 
-                   PrimaryIndexImpl const* index)
-      : IndexIterator(collection, trx), _index(index), _step(0), _total(0) {}
+                   PrimaryIndex const* index,
+                   PrimaryIndexImpl const* indexImpl);
 
   ~AnyIndexIterator() {}
   

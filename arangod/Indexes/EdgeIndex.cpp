@@ -116,6 +116,21 @@ static bool IsEqualElementEdgeByKey(void* userData, SimpleIndexElement const& le
     return false;
   }
 }
+  
+EdgeIndexIterator::EdgeIndexIterator(LogicalCollection* collection, arangodb::Transaction* trx,
+                                     arangodb::EdgeIndex const* index,
+                                     TRI_EdgeIndexHash_t const* indexImpl,
+                                     std::unique_ptr<VPackBuilder>& keys)
+    : IndexIterator(collection, trx, index),
+      _index(indexImpl),
+      _keys(keys.get()),
+      _iterator(_keys->slice()),
+      _posInBuffer(0),
+      _batchSize(1000),
+      _lastElement() {
+        
+  keys.release(); // now we have ownership for _keys
+}
 
 EdgeIndexIterator::~EdgeIndexIterator() {
   if (_keys != nullptr) {
@@ -134,14 +149,16 @@ IndexLookupResult EdgeIndexIterator::next() {
       if (tmp.isObject()) {
         tmp = tmp.get(StaticStrings::IndexEq);
       }
-      IndexLookupContext context(_trx, _collection, 1); 
+      ManagedDocumentResult result(_trx); 
+      IndexLookupContext context(_trx, _collection, &result, 1); 
       _index->lookupByKey(&context, &tmp, _buffer, _batchSize);
     } else if (_posInBuffer >= _buffer.size()) {
       // We have to refill the buffer
       _buffer.clear();
 
       _posInBuffer = 0;
-      IndexLookupContext context(_trx, _collection, 1); 
+      ManagedDocumentResult result(_trx); 
+      IndexLookupContext context(_trx, _collection, &result, 1); 
       _index->lookupByKeyContinue(&context, _lastElement, _buffer, _batchSize);
     }
     
@@ -177,14 +194,16 @@ void EdgeIndexIterator::nextBabies(std::vector<IndexLookupResult>& buffer, size_
       if (tmp.isObject()) {
         tmp = tmp.get(StaticStrings::IndexEq);
       }
-      IndexLookupContext context(_trx, _collection, 1); 
+      ManagedDocumentResult result(_trx); 
+      IndexLookupContext context(_trx, _collection, &result, 1); 
       _index->lookupByKey(&context, &tmp, _buffer, atMost);
       // fallthrough intentional
     } else {
       // Continue the lookup
       buffer.clear();
 
-      IndexLookupContext context(_trx, _collection, 1); 
+      ManagedDocumentResult result(_trx); 
+      IndexLookupContext context(_trx, _collection, &result, 1); 
       _index->lookupByKeyContinue(&context, _lastElement, _buffer, atMost);
     }
 
@@ -213,6 +232,16 @@ void EdgeIndexIterator::reset() {
   _iterator.reset();
   _lastElement = SimpleIndexElement();
 }
+  
+AnyDirectionEdgeIndexIterator::AnyDirectionEdgeIndexIterator(LogicalCollection* collection,
+                                arangodb::Transaction* trx,
+                                arangodb::EdgeIndex const* index,
+                                EdgeIndexIterator* outboundIterator,
+                                EdgeIndexIterator* inboundIterator)
+    : IndexIterator(collection, trx, index),
+      _outbound(outboundIterator),
+      _inbound(inboundIterator),
+      _useInbound(false) {}
 
 IndexLookupResult AnyDirectionEdgeIndexIterator::next() {
   IndexLookupResult res;
@@ -461,7 +490,8 @@ int EdgeIndex::insert(arangodb::Transaction* trx, TRI_voc_rid_t revisionId,
   SimpleIndexElement fromElement(buildFromElement(revisionId, doc));
   SimpleIndexElement toElement(buildToElement(revisionId, doc));
 
-  IndexLookupContext context(trx, _collection, 1); 
+  ManagedDocumentResult result(trx); 
+  IndexLookupContext context(trx, _collection, &result, 1); 
   _edgesFrom->insert(&context, fromElement, true, isRollback);
 
   try {
@@ -480,7 +510,8 @@ int EdgeIndex::remove(arangodb::Transaction* trx, TRI_voc_rid_t revisionId,
   SimpleIndexElement fromElement(buildFromElement(revisionId, doc));
   SimpleIndexElement toElement(buildToElement(revisionId, doc));
   
-  IndexLookupContext context(trx, _collection, 1); 
+  ManagedDocumentResult result(trx); 
+  IndexLookupContext context(trx, _collection, &result, 1); 
  
   try { 
     _edgesFrom->remove(&context, fromElement);
@@ -551,7 +582,8 @@ int EdgeIndex::sizeHint(arangodb::Transaction* trx, size_t size) {
 
   // set an initial size for the index for some new nodes to be created
   // without resizing
-  IndexLookupContext context(trx, _collection, 1); 
+  ManagedDocumentResult result(trx); 
+  IndexLookupContext context(trx, _collection, &result, 1); 
   int err = _edgesFrom->resize(&context, static_cast<uint32_t>(size + 2049));
 
   if (err != TRI_ERROR_NO_ERROR) {
@@ -708,27 +740,27 @@ IndexIterator* EdgeIndex::iteratorForSlice(
       TransactionBuilderLeaser fromBuilder(trx);
       std::unique_ptr<VPackBuilder> fromKeys(fromBuilder.steal());
       fromKeys->add(from);
-      auto left = std::make_unique<EdgeIndexIterator>(_collection, trx, _edgesFrom, fromKeys);
+      auto left = std::make_unique<EdgeIndexIterator>(_collection, trx, this, _edgesFrom, fromKeys);
 
       TransactionBuilderLeaser toBuilder(trx);
       std::unique_ptr<VPackBuilder> toKeys(toBuilder.steal());
       toKeys->add(to);
-      auto right = std::make_unique<EdgeIndexIterator>(_collection, trx, _edgesTo, toKeys);
-      return new AnyDirectionEdgeIndexIterator(_collection, trx, left.release(), right.release());
+      auto right = std::make_unique<EdgeIndexIterator>(_collection, trx, this, _edgesTo, toKeys);
+      return new AnyDirectionEdgeIndexIterator(_collection, trx, this, left.release(), right.release());
     }
     // OUTBOUND search
     TRI_ASSERT(to.isNull());
     TransactionBuilderLeaser builder(trx);
     std::unique_ptr<VPackBuilder> keys(builder.steal());
     keys->add(from);
-    return new EdgeIndexIterator(_collection, trx, _edgesFrom, keys);
+    return new EdgeIndexIterator(_collection, trx, this, _edgesFrom, keys);
   } else {
     // INBOUND search
     TRI_ASSERT(to.isArray());
     TransactionBuilderLeaser builder(trx);
     std::unique_ptr<VPackBuilder> keys(builder.steal());
     keys->add(to);
-    return new EdgeIndexIterator(_collection, trx, _edgesTo, keys);
+    return new EdgeIndexIterator(_collection, trx, this, _edgesTo, keys);
   }
 }
 
@@ -755,7 +787,7 @@ IndexIterator* EdgeIndex::createEqIterator(
   // _from or _to?
   bool const isFrom = (attrNode->stringEquals(StaticStrings::FromString));
 
-  return new EdgeIndexIterator(_collection, trx, isFrom ? _edgesFrom : _edgesTo, keys);
+  return new EdgeIndexIterator(_collection, trx, this, isFrom ? _edgesFrom : _edgesTo, keys);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -788,7 +820,7 @@ IndexIterator* EdgeIndex::createInIterator(
   // _from or _to?
   bool const isFrom = (attrNode->stringEquals(StaticStrings::FromString));
 
-  return new EdgeIndexIterator(_collection, trx, isFrom ? _edgesFrom : _edgesTo, keys);
+  return new EdgeIndexIterator(_collection, trx, this, isFrom ? _edgesFrom : _edgesTo, keys);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

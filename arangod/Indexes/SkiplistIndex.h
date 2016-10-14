@@ -147,8 +147,8 @@ class SkiplistInLookupBuilder : public BaseSkiplistLookupBuilder {
 
     ~SkiplistInLookupBuilder() {}
 
-/// @brief Compute the next lookup values
-///        If returns false there is no further lookup
+    /// @brief Compute the next lookup values
+    /// If returns false there is no further lookup
     bool next() override;
 
   private:
@@ -186,13 +186,8 @@ class SkiplistIterator final : public IndexIterator {
 
  public:
   SkiplistIterator(LogicalCollection* collection, arangodb::Transaction* trx,
-                   bool reverse, Node* left, Node* right)
-      : IndexIterator(collection, trx),
-        _reverse(reverse),
-        _leftEndPoint(left),
-        _rightEndPoint(right) {
-    reset(); // Initializes the cursor
-  }
+                   arangodb::SkiplistIndex const* index,
+                   bool reverse, Node* left, Node* right);
 
   // always holds the last node returned, initially equal to
   // the _leftEndPoint (or the
@@ -254,23 +249,11 @@ class SkiplistIterator2 final : public IndexIterator {
 
  public:
   SkiplistIterator2(LogicalCollection* collection, arangodb::Transaction* trx,
+      arangodb::SkiplistIndex const* index,
       TRI_Skiplist const* skiplist, size_t numPaths,
       std::function<int(void*, SkiplistIndexElement const*, SkiplistIndexElement const*,
                         arangodb::basics::SkipListCmpType)> const& CmpElmElm,
-      bool reverse, BaseSkiplistLookupBuilder* builder)
-      : IndexIterator(collection, trx),
-        _skiplistIndex(skiplist),
-        _numPaths(numPaths),
-        _reverse(reverse),
-        _cursor(nullptr),
-        _currentInterval(0),
-        _builder(builder),
-        _CmpElmElm(CmpElmElm) {
-    TRI_ASSERT(_builder != nullptr);
-    initNextInterval(); // Initializes the cursor
-    TRI_ASSERT((_intervals.empty() && _cursor == nullptr) ||
-               (!_intervals.empty() && _cursor != nullptr));
-  }
+      bool reverse, BaseSkiplistLookupBuilder* builder);
 
   ~SkiplistIterator2() {
     delete _builder;
