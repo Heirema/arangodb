@@ -49,7 +49,7 @@ RestImportHandler::RestImportHandler(GeneralRequest* request,
     : RestVocbaseBaseHandler(request, response),
       _onDuplicateAction(DUPLICATE_ERROR) {}
 
-RestHandler::status RestImportHandler::execute() {
+RestStatus RestImportHandler::execute() {
   // set default value for onDuplicate
   _onDuplicateAction = DUPLICATE_ERROR;
 
@@ -124,7 +124,7 @@ RestHandler::status RestImportHandler::execute() {
   }
 
   // this handler is done
-  return status::DONE;
+  return RestStatus::DONE;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
