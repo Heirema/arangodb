@@ -54,7 +54,7 @@ class CollectionRevisionsCache {
 
   // look up a revision
   template<typename T>
-  bool lookupRevision(arangodb::Transaction* trx, T& result, TRI_voc_rid_t revisionId);
+  bool lookupRevision(arangodb::Transaction* trx, T& result, TRI_voc_rid_t revisionId, bool shouldLock);
   
   // conditionally look up a revision
   bool lookupRevisionConditional(arangodb::Transaction* trx, ManagedMultiDocumentResult& result, TRI_voc_rid_t revisionId, TRI_voc_tick_t maxTick, bool excludeWal);
