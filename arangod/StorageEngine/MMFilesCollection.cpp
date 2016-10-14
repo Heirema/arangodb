@@ -172,7 +172,7 @@ int MMFilesCollection::OpenIteratorHandleDeletionMarker(TRI_df_marker_t const* m
   TRI_voc_rid_t revisionId;
 
   Transaction::extractKeyAndRevFromDocument(slice, keySlice, revisionId);
- 
+  
   collection->setRevision(revisionId, false);
   VPackValueLength length;
   char const* p = keySlice.getString(length);
@@ -223,7 +223,7 @@ int MMFilesCollection::OpenIteratorHandleDeletionMarker(TRI_df_marker_t const* m
     dfi->sizeDead += DatafileHelper::AlignedSize<int64_t>(size);
     state->_dfi->numberDeletions++;
 
-    collection->deletePrimaryIndex(trx, oldRevisionId, VPackSlice(vpack));
+    primaryIndex->removeKey(trx, oldRevisionId, VPackSlice(vpack));
 
     c->removeRevision(oldRevisionId, true);
   }

@@ -26,9 +26,11 @@
 
 #include "Basics/Common.h"
 #include "Basics/ReadWriteLock.h"
+#include "Indexes/IndexLookupContext.h"
 #include "StorageEngine/MMFilesDatafileStatistics.h"
 #include "StorageEngine/MMFilesRevisionsCache.h"
 #include "VocBase/Ditch.h"
+#include "VocBase/ManagedDocumentResult.h"
 #include "VocBase/PhysicalCollection.h"
 
 struct TRI_datafile_t;
@@ -50,6 +52,8 @@ class MMFilesCollection final : public PhysicalCollection {
     std::unordered_map<TRI_voc_fid_t, DatafileStatisticsContainer*> _stats;
     DatafileStatisticsContainer* _dfi;
     arangodb::Transaction* _trx;
+    ManagedDocumentResult _mmdr;
+    IndexLookupContext _context;
     uint64_t _deletions;
     uint64_t _documents;
     int64_t _initialCount;
@@ -61,6 +65,8 @@ class MMFilesCollection final : public PhysicalCollection {
           _stats(),
           _dfi(nullptr),
           _trx(trx),
+          _mmdr(trx),
+          _context(trx, collection, &_mmdr, 1),
           _deletions(0),
           _documents(0),
           _initialCount(-1) {
