@@ -23,6 +23,7 @@
 #include "RevisionCacheFeature.h"
 
 #include "ApplicationFeatures/ApplicationServer.h"
+#include "Basics/process-utils.h"
 #include "ProgramOptions/ProgramOptions.h"
 #include "ProgramOptions/Section.h"
 #include "VocBase/RevisionCacheChunkAllocator.h"
@@ -48,6 +49,11 @@ RevisionCacheFeature::RevisionCacheFeature(ApplicationServer* server)
   setOptional(false);
   requiresElevatedPrivileges(false);
   startsAfter("WorkMonitor");
+
+
+  if (TRI_PhysicalMemory != 0) {
+    _targetSize = static_cast<decltype(_targetSize)>(TRI_PhysicalMemory * 0.5);
+  }
 }
 
 void RevisionCacheFeature::collectOptions(std::shared_ptr<ProgramOptions> options) {
