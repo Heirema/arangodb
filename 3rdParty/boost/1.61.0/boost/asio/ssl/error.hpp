@@ -31,8 +31,8 @@ enum ssl_errors
 extern BOOST_ASIO_DECL
 const boost::system::error_category& get_ssl_category();
 
-static const boost::system::error_category& ssl_category
-  = boost::asio::error::get_ssl_category();
+//static const boost::system::error_category& ssl_category
+//  = boost::asio::error::get_ssl_category();
 
 } // namespace error
 } // namespace asio
