@@ -33,7 +33,7 @@ var arangodb = require('@arangodb');
 var ArangoCollection = arangodb.ArangoCollection;
 var ArangoError = arangodb.ArangoError;
 var errors = require("internal").errors;
-var request = require('@arangodb/request').request;
+var request = require('@arangodb/request').clusterRequest;
 var wait = require('internal').wait;
 var _ = require('lodash');
 
@@ -472,12 +472,12 @@ function createLocalCollections (plannedCollections, planVersion,
       servers: [ ourselves ],
     planVersion: planVersion };
 
-    console.error('creating Current/Collections/' + database + '/' +
+    console.debug('creating Current/Collections/' + database + '/' +
                   collInfo.planId + '/' + shard);
     global.ArangoAgency.set('Current/Collections/' + database + '/' +
     collInfo.planId + '/' + shard,
       payload);
-    console.error('creating Current/Collections/' + database + '/' +
+    console.debug('creating Current/Collections/' + database + '/' +
                   collInfo.planId + '/' + shard + ' done.');
   };
 
@@ -786,10 +786,10 @@ function dropLocalCollections (plannedCollections, currentCollections,
 
   var dropCollectionAgency = function (database, shardID, id) {
     try {
-      console.error('dropping Current/Collections/' + database + '/' +
+      console.debug('dropping Current/Collections/' + database + '/' +
                     id + '/' + shardID);
       global.ArangoAgency.remove('Current/Collections/' + database + '/' + id + '/' + shardID);
-      console.error('dropping Current/Collections/' + database + '/' +
+      console.debug('dropping Current/Collections/' + database + '/' +
                     id + '/' + shardID + ' done.');
     } catch (err) {
       // ignore errors
@@ -896,10 +896,10 @@ function cleanupCurrentCollections (plannedCollections, currentCollections,
   writeLocked) {
   var dropCollectionAgency = function (database, collection, shardID) {
     try {
-      console.error('cleaning Current/Collections/' + database + '/' +
+      console.debug('cleaning Current/Collections/' + database + '/' +
                     collection + '/' + shardID);
       global.ArangoAgency.remove('Current/Collections/' + database + '/' + collection + '/' + shardID);
-      console.error('cleaning Current/Collections/' + database + '/' +
+      console.debug('cleaning Current/Collections/' + database + '/' +
                     collection + '/' + shardID + ' done.');
     } catch (err) {
       // ignore errors
@@ -1119,7 +1119,7 @@ function synchronizeOneShard (database, shard, planId, leader) {
             shard, 300);
           console.debug('lockJobId:', lockJobId);
         } catch (err1) {
-          console.error('synchronizeOneShard: exception in startReadLockOnLeader:', err1);
+          console.error('synchronizeOneShard: exception in startReadLockOnLeader:', err1, err1.stack);
         }
         finally {
           cancelBarrier(ep, database, sy.barrierId);

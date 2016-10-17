@@ -2675,12 +2675,14 @@ OperationResult Transaction::truncate(std::string const& collectionName,
 /// @brief remove all documents in a collection, coordinator
 ////////////////////////////////////////////////////////////////////////////////
 
+#ifndef USE_ENTERPRISE
 OperationResult Transaction::truncateCoordinator(std::string const& collectionName,
                                                  OperationOptions& options) {
   return OperationResult(
       arangodb::truncateCollectionOnCoordinator(_vocbase->name(),
                                                 collectionName));
 }
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief remove all documents in a collection, local
@@ -2806,6 +2808,7 @@ OperationResult Transaction::count(std::string const& collectionName) {
 /// @brief count the number of documents in a collection
 //////////////////////////////////////////////////////////////////////////////
 
+#ifndef USE_ENTERPRISE
 OperationResult Transaction::countCoordinator(std::string const& collectionName) {
   uint64_t count = 0;
   int res = arangodb::countOnCoordinator(_vocbase->name(), collectionName, count);
@@ -2819,6 +2822,7 @@ OperationResult Transaction::countCoordinator(std::string const& collectionName)
 
   return OperationResult(resultBuilder.steal(), nullptr, "", TRI_ERROR_NO_ERROR, false);
 }
+#endif
 
 //////////////////////////////////////////////////////////////////////////////
 /// @brief count the number of documents in a collection
