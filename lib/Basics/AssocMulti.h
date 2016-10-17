@@ -358,16 +358,15 @@ class AssocMulti {
   /// @brief adds multiple elements to the array
   //////////////////////////////////////////////////////////////////////////////
 
-  int batchInsert(UserData* userData, std::vector<Element> const* data,
+  int batchInsert(std::function<void*()> const& contextCreator, 
+                  std::function<void(void*)> const& contextDestroyer,
+                  std::vector<Element> const* data,
                   size_t numThreads) {
     if (data->empty()) {
       // nothing to do
       return TRI_ERROR_NO_ERROR;
     }
 
-#ifdef TRI_CHECK_MULTI_POINTER_HASH
-    check(userData, true, true);
-#endif
     std::atomic<int> res(TRI_ERROR_NO_ERROR);
 
     std::vector<Element> const& elements = *(data);
@@ -391,8 +390,8 @@ class AssocMulti {
 
     // partition the work into some buckets
     {
-      std::function<void(size_t, size_t)> partitioner;
-      partitioner = [&](size_t lower, size_t upper) -> void {
+      std::function<void(size_t, size_t, void*)> partitioner;
+      partitioner = [&](size_t lower, size_t upper, void* userData) -> void {
         try {
           std::unordered_map<uint64_t, DocumentsPerBucket> partitions;
 
@@ -425,6 +424,8 @@ class AssocMulti {
         } catch (...) {
           res = TRI_ERROR_INTERNAL;
         }
+
+        contextDestroyer(userData);
       };
 
       std::vector<std::thread> threads;
@@ -442,7 +443,7 @@ class AssocMulti {
             upper = elements.size();
           }
 
-          threads.emplace_back(std::thread(partitioner, lower, upper));
+          threads.emplace_back(std::thread(partitioner, lower, upper, contextCreator()));
         }
       } catch (...) {
         res = TRI_ERROR_INTERNAL;
@@ -462,7 +463,7 @@ class AssocMulti {
 
     // now insert the bucket data in parallel
     {
-      auto inserter = [&](size_t chunk) -> void {
+      auto inserter = [&](size_t chunk, void* userData) -> void {
         try {
           for (auto const& it : allBuckets) {
             uint64_t bucketId = it.first;
@@ -484,6 +485,8 @@ class AssocMulti {
         } catch (...) {
           res = TRI_ERROR_INTERNAL;
         }
+
+        contextDestroyer(userData);
       };
 
       std::vector<std::thread> threads;
@@ -491,7 +494,7 @@ class AssocMulti {
 
       try {
         for (size_t i = 0; i < numThreads; ++i) {
-          threads.emplace_back(std::thread(inserter, i));
+          threads.emplace_back(std::thread(inserter, i, contextCreator()));
         }
       } catch (...) {
         res = TRI_ERROR_INTERNAL;
@@ -504,16 +507,22 @@ class AssocMulti {
     }
 
 #ifdef TRI_CHECK_MULTI_POINTER_HASH
-    check(userData, true, true);
+    {
+      void* userData = contextCreator();
+      check(userData, true, true);
+      contextDestroyer(userData);
+    }
 #endif
     if (res.load() != TRI_ERROR_NO_ERROR) {
       // Rollback such that the data can be deleted outside
+      void* userData = contextCreator();
       try {
         for (auto const& d : *data) {
           remove(userData, d);
         }
       } catch (...) {
       }
+      contextDestroyer(userData);
     }
     return res.load();
   }

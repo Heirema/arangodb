@@ -98,7 +98,7 @@ bool CollectionRevisionsCache::lookupRevision(Transaction* trx, T& result, TRI_v
     return result.lastVPack();
   }
 
-  CONDITIONAL_READ_LOCKER(locker, _lock, shouldLock);
+  READ_LOCKER(locker, _lock);
   
   RevisionCacheEntry found = _revisions.findByKey(nullptr, &revisionId);
 

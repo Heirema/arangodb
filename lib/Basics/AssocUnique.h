@@ -618,7 +618,9 @@ class AssocUnique {
   /// @brief adds multiple elements to the array
   //////////////////////////////////////////////////////////////////////////////
 
-  int batchInsert(UserData* userData, std::vector<Element> const* data,
+  int batchInsert(std::function<void*()> const& contextCreator, 
+                  std::function<void(void*)> const& contextDestroyer,
+                  std::vector<Element> const* data,
                   size_t numThreads) {
     if (data->empty()) {
       // nothing to do
@@ -646,7 +648,7 @@ class AssocUnique {
 
     // partition the work into some buckets
     {
-      auto partitioner = [&](size_t lower, size_t upper) -> void {
+      auto partitioner = [&](size_t lower, size_t upper, void* userData) -> void {
         try {
           std::unordered_map<uint64_t, DocumentsPerBucket> partitions;
 
@@ -679,6 +681,8 @@ class AssocUnique {
         } catch (...) {
           res = TRI_ERROR_OUT_OF_MEMORY;
         }
+
+        contextDestroyer(userData);
       };
 
       std::vector<std::thread> threads;
@@ -696,7 +700,7 @@ class AssocUnique {
             upper = elements.size();
           }
 
-          threads.emplace_back(std::thread(partitioner, lower, upper));
+          threads.emplace_back(std::thread(partitioner, lower, upper, contextCreator()));
         }
       } catch (...) {
         res = TRI_ERROR_OUT_OF_MEMORY;
@@ -716,7 +720,7 @@ class AssocUnique {
 
     // now insert the bucket data in parallel
     {
-      auto inserter = [&](size_t chunk) -> void {
+      auto inserter = [&](size_t chunk, void* userData) -> void {
         try {
           for (auto const& it : allBuckets) {
             uint64_t bucketId = it.first;
@@ -748,6 +752,8 @@ class AssocUnique {
         } catch (...) {
           res = TRI_ERROR_OUT_OF_MEMORY;
         }
+
+        contextDestroyer(userData);
       };
 
       std::vector<std::thread> threads;
@@ -755,7 +761,7 @@ class AssocUnique {
 
       try {
         for (size_t i = 0; i < numThreads; ++i) {
-          threads.emplace_back(std::thread(inserter, i));
+          threads.emplace_back(std::thread(inserter, i, contextCreator()));
         }
       } catch (...) {
         res = TRI_ERROR_OUT_OF_MEMORY;
@@ -769,12 +775,14 @@ class AssocUnique {
 
     if (res.load() != TRI_ERROR_NO_ERROR) {
       // Rollback such that the data can be deleted outside
+      void* userData = contextCreator();
       try {
         for (auto const& d : *data) {
           remove(userData, d);
         }
       } catch (...) {
       }
+      contextDestroyer(userData);
     }
     return res.load();
   }

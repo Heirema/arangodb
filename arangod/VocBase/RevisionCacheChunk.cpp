@@ -67,10 +67,8 @@ ChunkProtector::ChunkProtector(ChunkProtector&& other) : _chunk(other._chunk), _
 }
   
 ChunkProtector& ChunkProtector::operator=(ChunkProtector&& other) {
-  if (_chunk != nullptr && _chunk != other._chunk) {
-    _chunk->release();
-    _chunk = nullptr;
-    _isResponsible = false;
+  if (_chunk != nullptr && _chunk != other._chunk && _isResponsible) {
+    _chunk->release(); 
   }
 
   _chunk = other._chunk;
@@ -102,8 +100,8 @@ uint8_t const* ChunkProtector::vpack() const {
 
 // note: version must be 1 or higher as version 0 means "WAL"
 RevisionCacheChunk::RevisionCacheChunk(CollectionRevisionsCache* collectionCache, uint32_t size)
-        : _collectionCache(collectionCache), _data(nullptr), _writeOffset(0), 
-          _size(size), _versionAndRefCount(buildVersion(1)) {
+        : _collectionCache(collectionCache), _data(nullptr), _nextWriteOffset(0), 
+          _size(size), _numWritersQueued(0), _versionAndRefCount(buildVersion(1)) {
   TRI_ASSERT(versionPart(_versionAndRefCount) == 1);
   _data = new uint8_t[size];
 }
@@ -112,34 +110,49 @@ RevisionCacheChunk::~RevisionCacheChunk() {
   delete[] _data;
 }
 
+void RevisionCacheChunk::unqueueWriter() {
+  MUTEX_LOCKER(locker, _writeMutex);
+  TRI_ASSERT(_numWritersQueued > 0);
+  --_numWritersQueued;
+}
+
 uint32_t RevisionCacheChunk::advanceWritePosition(uint32_t size) {
   uint32_t offset;
   {
     MUTEX_LOCKER(locker, _writeMutex);
 
-    if (_writeOffset + size > _size) {
+    if (_nextWriteOffset + size > _size) {
       // chunk would be full
       return UINT32_MAX; // means: chunk is full
     }
-    offset = _writeOffset;
-    _writeOffset += size;
+    offset = _nextWriteOffset;
+    _nextWriteOffset += size;
+
+    ++_numWritersQueued;
   }
 
   return offset;
 }
 
 void RevisionCacheChunk::invalidate(std::vector<TRI_voc_rid_t>& revisions) {
-  revisions.clear();
-  // LOG(ERR) << "invalidate called";
-  // double t1 = TRI_microtime();
-  findRevisions(revisions);
-  // LOG(ERR) << "findRevisions took: " << (TRI_microtime() - t1);
-  // LOG(ERR) << "number of revisions: " << revisions.size();
-  if (!revisions.empty()) {
-    // double t1 = TRI_microtime();
-    _collectionCache->removeRevisions(revisions);
-    // LOG(ERR) << "removeRevisions took: " << (TRI_microtime() - t1);
+  // wait until all writers have finished
+  while (true) {
+    {
+      MUTEX_LOCKER(locker, _writeMutex);
+      if (_numWritersQueued == 0) {
+        break;
+      }
+    }
+    usleep(10000);
   }
+
+  revisions.clear();
+  findRevisions(revisions);
+  invalidate();
+  if (!revisions.empty()) {
+    _collectionCache->removeRevisions(revisions);
+  }
+  // increase version number once again
   invalidate();
 }
 
@@ -147,7 +160,7 @@ void RevisionCacheChunk::findRevisions(std::vector<TRI_voc_rid_t>& revisions) {
   // no need for write mutex here as the chunk is read-only once fully
   // written to
   uint8_t const* data = _data;
-  uint8_t const* end = _data + _writeOffset;
+  uint8_t const* end = _data + _nextWriteOffset;
   
   while (data < end) {
     // peek into document at the current position
@@ -155,8 +168,12 @@ void RevisionCacheChunk::findRevisions(std::vector<TRI_voc_rid_t>& revisions) {
     TRI_ASSERT(slice.isObject());
     data += slice.byteSize();
     
-    TRI_voc_rid_t rid = Transaction::extractRevFromDocument(slice);
-    revisions.emplace_back(rid);
+    try {
+      TRI_voc_rid_t rid = Transaction::extractRevFromDocument(slice);
+      revisions.emplace_back(rid);
+    } catch (...) {
+      // LOG(ERR) << "SLICE: " << slice.toJson();
+    }
   }
 }
 

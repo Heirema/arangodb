@@ -26,6 +26,7 @@
 
 #include "Basics/Common.h"
 #include "Basics/Mutex.h"
+#include "Logger/Logger.h"
 #include "VocBase/voc-types.h"
 
 namespace arangodb {
@@ -75,8 +76,13 @@ class RevisionCacheChunk {
   
   void reset(CollectionRevisionsCache* collectionCache) { 
     _collectionCache = collectionCache; 
-    _writeOffset = 0;
-    _versionAndRefCount.store(buildVersion(1));
+    _nextWriteOffset = 0;
+    // initialize chunk with a new version number
+    uint32_t newVersion = versionPart(_versionAndRefCount) + 1;
+    if (newVersion == UINT32_MAX) {
+      newVersion = 1;
+    }
+    _versionAndRefCount.store(buildVersion(newVersion));
   }
   
   inline uint8_t const* data() const noexcept { return _data; }
@@ -84,6 +90,7 @@ class RevisionCacheChunk {
   
   inline uint32_t version() { return versionPart(_versionAndRefCount); }
   
+  void unqueueWriter();
   uint32_t advanceWritePosition(uint32_t size);
 
   /// @brief increases the refcount value if the chunk's version matches
@@ -97,6 +104,13 @@ class RevisionCacheChunk {
   bool isUsed() noexcept;
 
   void invalidate(std::vector<TRI_voc_rid_t>& revisions);
+        
+  void wipeout() {
+#ifdef TRI_ENABLE_MAINTAINER_MODE
+    // overwrite data with garbage
+    memset(_data, 0xff, _size);
+#endif
+  }
   
   // align the length value to a multiple of blockSize
   static constexpr inline uint32_t alignSize(uint32_t value, uint32_t blockSize) {
@@ -143,10 +157,13 @@ class RevisionCacheChunk {
   uint8_t* _data;
 
   // pointer to the current write position
-  uint32_t _writeOffset;
+  uint32_t _nextWriteOffset;
 
   // size of the chunk's memory
   uint32_t const _size;
+
+  // number of writers that wait to copy their data into this chunk
+  uint64_t _numWritersQueued;
 
   // version and reference counter
   // the higher 32 bits contain the version number, the lower 32 bits contain the refcount

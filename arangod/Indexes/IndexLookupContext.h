@@ -56,6 +56,8 @@ class IndexLookupContext {
     return nullptr;
   }
 
+  ManagedDocumentResult* result() { return _result; }
+
   inline size_t numFields() const { return _numFields; }
 
  private:

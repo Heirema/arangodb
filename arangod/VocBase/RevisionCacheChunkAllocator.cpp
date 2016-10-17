@@ -258,6 +258,8 @@ bool RevisionCacheChunkAllocator::garbageCollect() {
     if (alreadyInvalidated) {
       // already invalidated
       if (!chunk->isUsed()) {
+        chunk->wipeout();
+        
         // remove chunk from full list
         {
           MUTEX_LOCKER(locker, _gcLock);
@@ -334,10 +336,16 @@ void RevisionCacheGCThread::beginShutdown() {
 
 void RevisionCacheGCThread::run() {
   while (!isStopping()) {
-    if (!_allocator->garbageCollect()) {
-      CONDITION_LOCKER(guard, _condition);
-      guard.wait(1000000);
-    } // otherwise directly continue the garbage collection
+    try {
+      if (!_allocator->garbageCollect()) {
+        CONDITION_LOCKER(guard, _condition);
+        guard.wait(1000000);
+      } // otherwise directly continue the garbage collection
+    } catch (std::exception const& ex) {
+      LOG(WARN) << "caught exception in ReadCacheCleaner: " << ex.what();
+    } catch (...) {
+      LOG(WARN) << "caught unknown exception in ReadCacheCleaner";
+    }
   }
 }
 

@@ -135,7 +135,11 @@ ChunkProtector ReadCache::insertAndLease(TRI_voc_rid_t revisionId, uint8_t const
       // we got a free slot in the chunk. copy data and return target position
       TRI_ASSERT(p.version() != 0);
       memcpy(p.vpack(), vpack, size); 
-      if (result.hasSeenChunk(p.chunk())) {
+      
+      RevisionCacheChunk* chunk = p.chunk();
+      chunk->unqueueWriter();
+      TRI_ASSERT(VPackSlice(p.vpack()).isObject());
+      if (result.hasSeenChunk(chunk)) {
         result.addExisting(p, revisionId);
       } else {
         result.add(p, revisionId);

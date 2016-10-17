@@ -523,9 +523,20 @@ int EdgeIndex::batchInsert(arangodb::Transaction* trx,
   if (documents.empty()) {
     return TRI_ERROR_NO_ERROR;
   }
-
+  
   std::vector<SimpleIndexElement> elements;
   elements.reserve(documents.size());
+
+  // functions that will be called for each thread
+  auto creator = [&trx, this]() -> void* {
+    ManagedDocumentResult* result = new ManagedDocumentResult(trx);
+    return new IndexLookupContext(trx, _collection, result, 1);
+  };
+  auto destroyer = [](void* userData) {
+    IndexLookupContext* context = static_cast<IndexLookupContext*>(userData);
+    delete context->result();
+    delete context;
+  };
 
   // _from
   for (auto const& it : documents) {
@@ -533,7 +544,7 @@ int EdgeIndex::batchInsert(arangodb::Transaction* trx,
     elements.emplace_back(SimpleIndexElement(it.first, value, static_cast<uint32_t>(value.begin() - it.second.begin())));
   }
 
-  int res = _edgesFrom->batchInsert(trx, &elements, numThreads);
+  int res = _edgesFrom->batchInsert(creator, destroyer, &elements, numThreads);
 
   if (res != TRI_ERROR_NO_ERROR) {
     return res;
@@ -546,7 +557,7 @@ int EdgeIndex::batchInsert(arangodb::Transaction* trx,
     elements.emplace_back(SimpleIndexElement(it.first, value, static_cast<uint32_t>(value.begin() - it.second.begin())));
   }
 
-  res = _edgesTo->batchInsert(trx, &elements, numThreads);
+  res = _edgesTo->batchInsert(creator, destroyer, &elements, numThreads);
 
   if (res != TRI_ERROR_NO_ERROR) {
     return res;

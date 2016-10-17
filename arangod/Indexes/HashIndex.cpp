@@ -854,10 +854,18 @@ int HashIndex::batchInsertUnique(arangodb::Transaction* trx,
     return TRI_ERROR_NO_ERROR;
   }
   
-  ManagedDocumentResult result(trx); 
-  IndexLookupContext context(trx, _collection, &result, numPaths()); 
+  // functions that will be called for each thread
+  auto creator = [&trx, this]() -> void* {
+    ManagedDocumentResult* result = new ManagedDocumentResult(trx);
+    return new IndexLookupContext(trx, _collection, result, numPaths());
+  };
+  auto destroyer = [](void* userData) {
+    IndexLookupContext* context = static_cast<IndexLookupContext*>(userData);
+    delete context->result();
+    delete context;
+  };
   
-  int res = _uniqueArray->_hashArray->batchInsert(&context, &elements, numThreads);
+  int res = _uniqueArray->_hashArray->batchInsert(creator, destroyer, &elements, numThreads);
 
   if (res != TRI_ERROR_NO_ERROR) {
     for (auto& it : elements) {
@@ -953,9 +961,18 @@ int HashIndex::batchInsertMulti(arangodb::Transaction* trx,
     return TRI_ERROR_NO_ERROR;
   }
   
-  ManagedDocumentResult result(trx); 
-  IndexLookupContext context(trx, _collection, &result, numPaths()); 
-  return _multiArray->_hashArray->batchInsert(&context, &elements, numThreads);
+  // functions that will be called for each thread
+  auto creator = [&trx, this]() -> void* {
+    ManagedDocumentResult* result = new ManagedDocumentResult(trx);
+    return new IndexLookupContext(trx, _collection, result, numPaths());
+  };
+  auto destroyer = [](void* userData) {
+    IndexLookupContext* context = static_cast<IndexLookupContext*>(userData);
+    delete context->result();
+    delete context;
+  };
+
+  return _multiArray->_hashArray->batchInsert(creator, destroyer, &elements, numThreads);
 }
 
 int HashIndex::removeUniqueElement(arangodb::Transaction* trx,
