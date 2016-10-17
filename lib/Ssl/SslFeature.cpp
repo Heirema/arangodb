@@ -35,7 +35,7 @@
 #include "Ssl/ssl-helper.h"
 
 #ifndef OPENSSL_THREADS
-#error missing thread support for openssl, please recomple OpenSSL with threads
+#error missing thread support for openssl, please recompile OpenSSL with threads
 #endif
 
 using namespace arangodb;
@@ -44,8 +44,8 @@ using namespace arangodb::options;
 
 // OPEN SSL support
 namespace {
-long* opensslLockCount;
-TRI_mutex_t* opensslLocks;
+//long* opensslLockCount;
+//TRI_mutex_t* opensslLocks;
 
 #if OPENSSL_VERSION_NUMBER < 0x01000000L
 
@@ -77,16 +77,19 @@ void setter(CRYPTO_THREADID* id, unsigned long val) {
 }
 #endif
 
+/*
 static void arango_threadid_func(CRYPTO_THREADID* id) {
   auto self = Thread::currentThreadId();
 
   setter<decltype(self)>(id, self);
 }
+*/
 
 #endif
 
-void opensslLockingCallback(int mode, int type, char const* /* file */,
-                            int /* line */) {
+/*
+void opensslLockingCallback(int mode, int type, char const* file,
+                            int line) {
   if (mode & CRYPTO_LOCK) {
     TRI_LockMutex(&(opensslLocks[type]));
     opensslLockCount[type]++;
@@ -94,7 +97,9 @@ void opensslLockingCallback(int mode, int type, char const* /* file */,
     TRI_UnlockMutex(&(opensslLocks[type]));
   }
 }
+*/
 
+/*
 void opensslSetup() {
   opensslLockCount = (long*)OPENSSL_malloc(CRYPTO_num_locks() * sizeof(long));
   opensslLocks =
@@ -113,7 +118,9 @@ void opensslSetup() {
   CRYPTO_set_locking_callback(opensslLockingCallback);
 #endif
 }
+*/
 
+/*
 void opensslCleanup() {
   CRYPTO_set_locking_callback(nullptr);
 
@@ -130,6 +137,7 @@ void opensslCleanup() {
   OPENSSL_free(opensslLocks);
   OPENSSL_free(opensslLockCount);
 }
+*/
 }
 
 const boost::asio::ssl::detail::openssl_init<true> SslFeature::sslBase{};
