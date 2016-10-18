@@ -94,14 +94,13 @@ struct ConstDistanceExpanderLocal {
       // has to stay intact.
       _cursor.clear();
       LogicalCollection* collection = edgeCursor->collection();
-      ManagedMultiDocumentResult mmdr(_block->transaction());
+      ManagedDocumentResult mmdr(_block->transaction());
       while (edgeCursor->hasMore()) {
         edgeCursor->getMoreMptr(_cursor, UINT64_MAX);
         for (auto const& element : _cursor) {
           TRI_voc_rid_t revisionId = element.revisionId();
           if (collection->readRevision(_block->transaction(), mmdr, revisionId)) {
-            uint8_t const* vpack = mmdr.back();
-            VPackSlice edge(vpack);
+            VPackSlice edge(mmdr.vpack());
             VPackSlice from =
                 arangodb::Transaction::extractFromFromDocument(edge);
             if (from == v) {
@@ -237,7 +236,7 @@ struct EdgeWeightExpanderLocal {
       // next edge cursor.
       // While iterating over the edge cursor, _cursor
       // has to stay intact.
-      ManagedMultiDocumentResult mmdr(_block->transaction());
+      ManagedDocumentResult mmdr(_block->transaction());
       cursor.clear();
       LogicalCollection* collection = edgeCursor->collection();
       while (edgeCursor->hasMore()) {
@@ -245,8 +244,7 @@ struct EdgeWeightExpanderLocal {
         for (auto const& element : cursor) {
           TRI_voc_rid_t revisionId = element.revisionId();
           if (collection->readRevision(_block->transaction(), mmdr, revisionId)) {
-            uint8_t const* vpack = mmdr.back();
-            VPackSlice edge(vpack);
+            VPackSlice edge(mmdr.vpack());
             VPackSlice from =
                 arangodb::Transaction::extractFromFromDocument(edge);
             VPackSlice to = arangodb::Transaction::extractToFromDocument(edge);

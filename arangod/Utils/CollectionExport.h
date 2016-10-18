@@ -35,6 +35,7 @@ namespace arangodb {
 
 class CollectionGuard;
 class DocumentDitch;
+class RevisionCacheChunk;
 
 class CollectionExport {
   friend class ExportCursor;
@@ -67,7 +68,8 @@ class CollectionExport {
   std::string const _name;
   arangodb::CollectionNameResolver _resolver;
   Restrictions _restrictions;
-  ManagedMultiDocumentResult _result;
+  std::vector<uint8_t const*> _vpack;
+  std::unordered_set<RevisionCacheChunk*> _chunks;
 };
 }
 

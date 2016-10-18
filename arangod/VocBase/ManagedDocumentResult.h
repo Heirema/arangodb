@@ -115,55 +115,6 @@ class ManagedDocumentResult {
   ChunkCache _chunkCache;
 };
 
-class ManagedMultiDocumentResult {
- public:
-  ManagedMultiDocumentResult() = delete;
-  ManagedMultiDocumentResult(ManagedMultiDocumentResult const& other) = delete;
-  ManagedMultiDocumentResult(ManagedMultiDocumentResult&& other) = delete;
-  ManagedMultiDocumentResult& operator=(ManagedMultiDocumentResult const& other) = delete;
-  ManagedMultiDocumentResult& operator=(ManagedMultiDocumentResult&& other) = delete;
-
-  explicit ManagedMultiDocumentResult(Transaction*);
-  ~ManagedMultiDocumentResult();
-  
-  bool hasSeenChunk(RevisionCacheChunk* chunk) const { return _chunkCache.contains(chunk); }
-
-  inline uint8_t const* at(size_t position) const {
-    return _results.at(position); 
-  }
-  
-  inline uint8_t const* operator[](size_t position) const {
-    return _results[position]; 
-  }
-  
-  bool empty() const { return _results.empty(); }
-  size_t size() const { return _results.size(); }
-  void clear() { _results.clear(); _lastRevisionId = 0; }
-  void reserve(size_t size) { _results.reserve(size); }
-  uint8_t const*& back() { return _results.back(); }
-  uint8_t const* const& back() const { return _results.back(); }
-  
-  std::vector<uint8_t const*>::iterator begin() { return _results.begin(); }
-  std::vector<uint8_t const*>::iterator end() { return _results.end(); }
-  
-  void add(ChunkProtector& protector, TRI_voc_rid_t revisionId);
-  void addExisting(ChunkProtector& protector, TRI_voc_rid_t revisionId);
-  
-  TRI_voc_rid_t lastRevisionId() const { return _lastRevisionId; }
-  uint8_t const* lastVPack() const { return _results.back(); }
-  
-  inline uint8_t const* vpack() const { 
-    TRI_ASSERT(!_results.empty());
-    return _results.back();
-  }
- 
- private:
-  Transaction* _trx;
-  std::vector<uint8_t const*> _results;
-  TRI_voc_rid_t _lastRevisionId;
-  ChunkCache _chunkCache;
-};
-
 }
 
 #endif

@@ -775,7 +775,7 @@ static AqlValue buildGeoResult(arangodb::Transaction* trx,
             });
 
   try {
-    ManagedMultiDocumentResult mmdr(trx);
+    ManagedDocumentResult mmdr(trx);
     TransactionBuilderLeaser builder(trx);
     builder->openArray();
     if (!attributeName.empty()) {
@@ -785,7 +785,7 @@ static AqlValue buildGeoResult(arangodb::Transaction* trx,
         builder->add(attributeName, VPackValue(it._distance));
         TRI_voc_rid_t revisionId = it._revisionId;
         if (collection->readRevision(trx, mmdr, revisionId)) {
-          VPackSlice doc(mmdr.back());
+          VPackSlice doc(mmdr.vpack());
           for (auto const& entry : VPackObjectIterator(doc)) {
             std::string key = entry.key.copyString();
             if (key != attributeName) {
@@ -798,8 +798,7 @@ static AqlValue buildGeoResult(arangodb::Transaction* trx,
     } else {
       for (auto& it : distances) {
         if (collection->readRevision(trx, mmdr, it._revisionId)) {
-          uint8_t const* vpack = mmdr.back();
-          builder->addExternal(vpack);
+          builder->addExternal(mmdr.vpack());
         }
       }
     }
@@ -3931,13 +3930,12 @@ AqlValue Functions::Fulltext(arangodb::aql::Query* query,
   try {
     builder->openArray();
 
-    ManagedMultiDocumentResult mmdr(trx);
+    ManagedDocumentResult mmdr(trx);
     size_t const numResults = queryResult->_numDocuments;
     for (size_t i = 0; i < numResults; ++i) {
       TRI_voc_rid_t revisionId = FulltextIndex::toRevision(queryResult->_documents[i]);
       if (collection->readRevision(trx, mmdr, revisionId)) {
-        uint8_t const* vpack = mmdr.back();
-        builder->addExternal(vpack);
+        builder->addExternal(mmdr.vpack());
       }
     }
     builder->close();

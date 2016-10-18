@@ -26,6 +26,7 @@
 
 #include "Basics/Common.h"
 #include "Basics/Mutex.h"
+#include "VocBase/ManagedDocumentResult.h"
 #include "VocBase/RevisionCacheChunk.h"
 #include "VocBase/RevisionCacheChunkAllocator.h"
 #include "VocBase/voc-types.h"
@@ -189,11 +190,9 @@ class ReadCache {
 
   void closeWriteChunk();
 
-  template<typename T>
-  ChunkProtector readAndLease(RevisionCacheEntry const&, T& result);
+  ChunkProtector readAndLease(RevisionCacheEntry const&, ManagedDocumentResult& result);
 
-  template<typename T>
-  ChunkProtector insertAndLease(TRI_voc_rid_t revisionId, uint8_t const* vpack, T& result);
+  ChunkProtector insertAndLease(TRI_voc_rid_t revisionId, uint8_t const* vpack, ManagedDocumentResult& result);
 
  private:
   RevisionCacheChunkAllocator* _allocator;

@@ -90,8 +90,7 @@ void CollectionRevisionsCache::clear() {
 }
 
 // look up a revision
-template<typename T>
-bool CollectionRevisionsCache::lookupRevision(Transaction* trx, T& result, TRI_voc_rid_t revisionId, bool shouldLock) {
+bool CollectionRevisionsCache::lookupRevision(Transaction* trx, ManagedDocumentResult& result, TRI_voc_rid_t revisionId, bool shouldLock) {
   TRI_ASSERT(revisionId != 0);
   
   if (result.lastRevisionId() == revisionId) {
@@ -143,14 +142,7 @@ bool CollectionRevisionsCache::lookupRevision(Transaction* trx, T& result, TRI_v
   return true;
 }
 
-// template instanciations for lookupRevision
-template
-bool CollectionRevisionsCache::lookupRevision<ManagedDocumentResult>(Transaction*, ManagedDocumentResult& result, TRI_voc_rid_t revisionId, bool shouldLock);
-
-template
-bool CollectionRevisionsCache::lookupRevision<ManagedMultiDocumentResult>(Transaction*, ManagedMultiDocumentResult& result, TRI_voc_rid_t revisionId, bool shouldLock);
-  
-bool CollectionRevisionsCache::lookupRevisionConditional(Transaction* trx, ManagedMultiDocumentResult& result, TRI_voc_rid_t revisionId, TRI_voc_tick_t maxTick, bool excludeWal) {
+bool CollectionRevisionsCache::lookupRevisionConditional(Transaction* trx, ManagedDocumentResult& result, TRI_voc_rid_t revisionId, TRI_voc_tick_t maxTick, bool excludeWal) {
   // fetch document from engine
   uint8_t const* vpack = readFromEngineConditional(revisionId, maxTick, excludeWal);
 

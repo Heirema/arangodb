@@ -1144,15 +1144,17 @@ class ConstDistanceFinder : public PathFinder<VertexId, Path> {
 
     std::vector<EdgeId> edges;
     std::vector<VertexId> neighbors;
+    std::deque<VertexId> nextClosure;
     while (!_leftClosure.empty() && !_rightClosure.empty()) {
       edges.clear();
       neighbors.clear();
-      std::deque<VertexId> _nextClosure;
+      nextClosure.clear();
       if (_leftClosure.size() < _rightClosure.size()) {
         for (VertexId& v : _leftClosure) {
           _leftNeighborExpander(v, edges, neighbors);
-          TRI_ASSERT(edges.size() == neighbors.size());
-          for (size_t i = 0; i < neighbors.size(); ++i) {
+          size_t const neighborsSize = neighbors.size();
+          TRI_ASSERT(edges.size() == neighborsSize);
+          for (size_t i = 0; i < neighborsSize; ++i) {
             VertexId const n = neighbors.at(i);
             if (_leftFound.find(n) == _leftFound.end()) {
               auto leftFoundIt = _leftFound.emplace(n, new PathSnippet(v, edges.at(i))).first;
@@ -1161,14 +1163,14 @@ class ConstDistanceFinder : public PathFinder<VertexId, Path> {
                 result._vertices.emplace_back(n);
                 auto it = leftFoundIt;
                 VertexId next;
-                while (it->second != nullptr) {
+                while (it != _leftFound.end() && it->second != nullptr) {
                   next = it->second->_pred;
                   result._vertices.push_front(next);
                   result._edges.push_front(it->second->_path);
                   it = _leftFound.find(next);
                 }
                 it = rightFoundIt;
-                while (it->second != nullptr) {
+                while (it != _rightFound.end() && it->second != nullptr) {
                   next = it->second->_pred;
                   result._vertices.emplace_back(next);
                   result._edges.emplace_back(it->second->_path);
@@ -1180,16 +1182,18 @@ class ConstDistanceFinder : public PathFinder<VertexId, Path> {
                 }
                 return true;
               }
-              _nextClosure.emplace_back(n);
+              nextClosure.emplace_back(n);
             }
           }
         }
-        _leftClosure = _nextClosure;
+        _leftClosure = std::move(nextClosure);
+        nextClosure.clear();
       } else {
         for (VertexId& v : _rightClosure) {
           _rightNeighborExpander(v, edges, neighbors);
-          TRI_ASSERT(edges.size() == neighbors.size());
-          for (size_t i = 0; i < neighbors.size(); ++i) {
+          size_t const neighborsSize = neighbors.size();
+          TRI_ASSERT(edges.size() == neighborsSize);
+          for (size_t i = 0; i < neighborsSize; ++i) {
             VertexId const n = neighbors.at(i);
             if (_rightFound.find(n) == _rightFound.end()) {
               auto rightFoundIt = _rightFound.emplace(n, new PathSnippet(v, edges.at(i))).first;
@@ -1198,14 +1202,14 @@ class ConstDistanceFinder : public PathFinder<VertexId, Path> {
                 result._vertices.emplace_back(n);
                 auto it = leftFoundIt;
                 VertexId next;
-                while (it->second != nullptr) {
+                while (it != _leftFound.end() && it->second != nullptr) {
                   next = it->second->_pred;
                   result._vertices.push_front(next);
                   result._edges.push_front(it->second->_path);
                   it = _leftFound.find(next);
                 }
                 it = rightFoundIt;
-                while (it->second != nullptr) {
+                while (it != _rightFound.end() && it->second != nullptr) {
                   next = it->second->_pred;
                   result._vertices.emplace_back(next);
                   result._edges.emplace_back(it->second->_path);
@@ -1217,11 +1221,12 @@ class ConstDistanceFinder : public PathFinder<VertexId, Path> {
                 }
                 return true;
               }
-              _nextClosure.emplace_back(n);
+              nextClosure.emplace_back(n);
             }
           }
         }
-        _rightClosure = _nextClosure;
+        _rightClosure = std::move(nextClosure);
+        nextClosure.clear();
       }
     }
     return false;

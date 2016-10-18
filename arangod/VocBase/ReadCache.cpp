@@ -67,8 +67,7 @@ void ReadCache::closeWriteChunk() {
   }
 }
 
-template<typename T>
-ChunkProtector ReadCache::readAndLease(RevisionCacheEntry const& entry, T& result) {
+ChunkProtector ReadCache::readAndLease(RevisionCacheEntry const& entry, ManagedDocumentResult& result) {
   if (result.hasSeenChunk(entry.chunk()) && entry.offset() != UINT32_MAX) {
     ChunkProtector p(entry.chunk(), entry.offset(), entry.version(), false);
     result.addExisting(p, entry.revisionId);
@@ -85,15 +84,7 @@ ChunkProtector ReadCache::readAndLease(RevisionCacheEntry const& entry, T& resul
   return p;
 }
 
-// template instanciations
-template
-ChunkProtector ReadCache::readAndLease<ManagedDocumentResult>(RevisionCacheEntry const& entry, ManagedDocumentResult& result);
-
-template
-ChunkProtector ReadCache::readAndLease<ManagedMultiDocumentResult>(RevisionCacheEntry const& entry, ManagedMultiDocumentResult& result);
-
-template<typename T>
-ChunkProtector ReadCache::insertAndLease(TRI_voc_rid_t revisionId, uint8_t const* vpack, T& result) {
+ChunkProtector ReadCache::insertAndLease(TRI_voc_rid_t revisionId, uint8_t const* vpack, ManagedDocumentResult& result) {
   TRI_ASSERT(revisionId != 0);
   TRI_ASSERT(vpack != nullptr);
 
@@ -151,8 +142,3 @@ ChunkProtector ReadCache::insertAndLease(TRI_voc_rid_t revisionId, uint8_t const
   }
 }
 
-template
-ChunkProtector ReadCache::insertAndLease<ManagedDocumentResult>(TRI_voc_rid_t revisionId, uint8_t const* vpack, ManagedDocumentResult& result);
-
-template
-ChunkProtector ReadCache::insertAndLease<ManagedMultiDocumentResult>(TRI_voc_rid_t revisionId, uint8_t const* vpack, ManagedMultiDocumentResult& result);

@@ -31,6 +31,7 @@
 #include "Utils/StandaloneTransactionContext.h"
 #include "VocBase/Ditch.h"
 #include "VocBase/LogicalCollection.h"
+#include "VocBase/RevisionCacheChunk.h"
 #include "VocBase/vocbase.h"
 
 using namespace arangodb;
@@ -42,8 +43,7 @@ CollectionExport::CollectionExport(TRI_vocbase_t* vocbase,
       _ditch(nullptr),
       _name(name),
       _resolver(vocbase),
-      _restrictions(restrictions),
-      _result(nullptr) {
+      _restrictions(restrictions) {
   // prevent the collection from being unloaded while the export is ongoing
   // this may throw
   _guard.reset(new arangodb::CollectionGuard(vocbase, _name.c_str(), false));
@@ -55,6 +55,10 @@ CollectionExport::CollectionExport(TRI_vocbase_t* vocbase,
 CollectionExport::~CollectionExport() {
   if (_ditch != nullptr) {
     _ditch->ditches()->freeDocumentDitch(_ditch, false);
+  }
+
+  for (auto& chunk : _chunks) {
+    chunk->release();
   }
 }
 
@@ -105,17 +109,22 @@ void CollectionExport::run(uint64_t maxWaitTime, size_t limit) {
     } else {
       limit = maxDocuments;
     }
-    _result.reserve(maxDocuments);
 
-    trx.invokeOnAllElements(_collection->name(), [this, &limit, &trx](SimpleIndexElement const& element) {
+    _vpack.reserve(limit);
+
+    ManagedDocumentResult mmdr(&trx);
+    trx.invokeOnAllElements(_collection->name(), [this, &limit, &trx, &mmdr](SimpleIndexElement const& element) {
       if (limit == 0) {
         return false;
       }
-      if (_collection->readRevisionConditional(&trx, _result, element.revisionId(), 0, true)) {
+      if (_collection->readRevisionConditional(&trx, mmdr, element.revisionId(), 0, true)) {
+        _vpack.emplace_back(mmdr.vpack());
         --limit;
       }
       return true;
     });
+
+    trx.transactionContext()->stealChunks(_chunks);
 
     trx.finish(res);
   }

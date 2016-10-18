@@ -1073,11 +1073,10 @@ int InitialSyncer::handleSyncKeys(arangodb::LogicalCollection* col,
     markers.reserve(idx->size());
 
     uint64_t iterations = 0;
-    ManagedMultiDocumentResult mmdr(&trx);
+    ManagedDocumentResult mmdr(&trx);
     trx.invokeOnAllElements(trx.name(), [this, &trx, &mmdr, &markers, &iterations, &idx](SimpleIndexElement const& element) {
       if (idx->collection()->readRevision(&trx, mmdr, element.revisionId())) {
-        uint8_t const* vpack = mmdr.back();
-        markers.emplace_back(vpack);
+        markers.emplace_back(mmdr.vpack());
         
         if (++iterations % 10000 == 0) {
           if (checkAborted()) {

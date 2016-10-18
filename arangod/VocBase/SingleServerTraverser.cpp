@@ -75,11 +75,10 @@ bool SingleServerEdgeCursor::next(std::vector<VPackSlice>& result,
   _cachePos++;
   if (_cachePos < _cache.size()) {
     LogicalCollection* collection = _cursors[_currentCursor][_currentSubCursor]->collection();
-    ManagedMultiDocumentResult mmdr(_trx);
+    ManagedDocumentResult mmdr(_trx);
     TRI_voc_rid_t revisionId = _cache[_cachePos].revisionId();
     if (collection->readRevision(_trx, mmdr, revisionId)) {
-      uint8_t const* vpack = mmdr.back();
-      result.emplace_back(vpack);
+      result.emplace_back(mmdr.vpack());
     }
     if (_internalCursorMapping != nullptr) {
       TRI_ASSERT(_currentCursor < _internalCursorMapping->size());
@@ -125,13 +124,12 @@ bool SingleServerEdgeCursor::next(std::vector<VPackSlice>& result,
     }
   } while (_cache.empty());
 
-  ManagedMultiDocumentResult mmdr(_trx);
+  ManagedDocumentResult mmdr(_trx);
   TRI_ASSERT(_cachePos < _cache.size());
   LogicalCollection* collection = cursor->collection();
   TRI_voc_rid_t revisionId = _cache[_cachePos].revisionId();
   if (collection->readRevision(_trx, mmdr, revisionId)) {
-    uint8_t const* vpack = mmdr.back();
-    result.emplace_back(vpack);
+    result.emplace_back(mmdr.vpack());
   }
   if (_internalCursorMapping != nullptr) {
     TRI_ASSERT(_currentCursor < _internalCursorMapping->size());
@@ -148,7 +146,7 @@ bool SingleServerEdgeCursor::readAll(std::unordered_set<VPackSlice>& result,
     return false;
   }
   
-  ManagedMultiDocumentResult mmdr(_trx); // TODO
+  ManagedDocumentResult mmdr(_trx); // TODO
 
   if (_internalCursorMapping != nullptr) {
     TRI_ASSERT(_currentCursor < _internalCursorMapping->size());
@@ -167,8 +165,7 @@ bool SingleServerEdgeCursor::readAll(std::unordered_set<VPackSlice>& result,
       for (auto const& element : _cache) {
         TRI_voc_rid_t revisionId = element.revisionId();
         if (collection->readRevision(_trx, mmdr, revisionId)) {
-          uint8_t const* vpack = mmdr.back();
-          result.emplace(vpack);
+          result.emplace(mmdr.vpack());
         }
       }
     }

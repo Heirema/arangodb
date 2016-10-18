@@ -54,7 +54,6 @@ class Builder;
 
 class Index;
 class ManagedDocumentResult;
-class ManagedMultiDocumentResult;
 class RevisionCacheChunk;
 
 namespace aql {

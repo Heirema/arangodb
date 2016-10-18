@@ -3508,12 +3508,7 @@ bool LogicalCollection::readRevision(Transaction* trx, ManagedDocumentResult& re
   return _revisionsCache->lookupRevision(trx, result, revisionId, _status == TRI_VOC_COL_STATUS_LOADING);
 }
 
-bool LogicalCollection::readRevision(Transaction* trx, ManagedMultiDocumentResult& result, TRI_voc_rid_t revisionId) {
-  TRI_ASSERT(_revisionsCache);
-  return _revisionsCache->lookupRevision(trx, result, revisionId, _status == TRI_VOC_COL_STATUS_LOADING);
-}
-
-bool LogicalCollection::readRevisionConditional(Transaction* trx, ManagedMultiDocumentResult& result, TRI_voc_rid_t revisionId, TRI_voc_tick_t maxTick, bool excludeWal) {
+bool LogicalCollection::readRevisionConditional(Transaction* trx, ManagedDocumentResult& result, TRI_voc_rid_t revisionId, TRI_voc_tick_t maxTick, bool excludeWal) {
   TRI_ASSERT(_revisionsCache);
   return _revisionsCache->lookupRevisionConditional(trx, result, revisionId, maxTick, excludeWal);
 }

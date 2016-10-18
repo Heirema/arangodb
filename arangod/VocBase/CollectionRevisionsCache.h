@@ -53,11 +53,10 @@ class CollectionRevisionsCache {
   void clear();
 
   // look up a revision
-  template<typename T>
-  bool lookupRevision(arangodb::Transaction* trx, T& result, TRI_voc_rid_t revisionId, bool shouldLock);
+  bool lookupRevision(arangodb::Transaction* trx, ManagedDocumentResult& result, TRI_voc_rid_t revisionId, bool shouldLock);
   
   // conditionally look up a revision
-  bool lookupRevisionConditional(arangodb::Transaction* trx, ManagedMultiDocumentResult& result, TRI_voc_rid_t revisionId, TRI_voc_tick_t maxTick, bool excludeWal);
+  bool lookupRevisionConditional(arangodb::Transaction* trx, ManagedDocumentResult& result, TRI_voc_rid_t revisionId, TRI_voc_tick_t maxTick, bool excludeWal);
   
   // insert from chunk
   void insertRevision(TRI_voc_rid_t revisionId, RevisionCacheChunk* chunk, uint32_t offset, uint32_t version);

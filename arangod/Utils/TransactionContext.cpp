@@ -189,6 +189,11 @@ void TransactionContext::addChunk(RevisionCacheChunk* chunk) {
   // now need to keep track of it twice
   chunk->release();
 }
+  
+void TransactionContext::stealChunks(std::unordered_set<RevisionCacheChunk*>& target) {
+  target.clear();
+  _chunks.swap(target);
+} 
 
 //////////////////////////////////////////////////////////////////////////////
 /// @brief temporarily lease a StringBuffer object

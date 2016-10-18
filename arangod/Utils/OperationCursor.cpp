@@ -75,7 +75,7 @@ void OperationCursor::getMore(std::shared_ptr<OperationResult>& opRes,
  
   LogicalCollection* collection = _indexIterator->collection(); 
   Transaction* trx = _indexIterator->transaction();
-  ManagedMultiDocumentResult mmdr(trx); // TODO 
+  ManagedDocumentResult mmdr(trx); // TODO 
   VPackBuilder builder(opRes->buffer);
   builder.clear();
   try {
@@ -87,11 +87,10 @@ void OperationCursor::getMore(std::shared_ptr<OperationResult>& opRes,
       --_limit;
       TRI_voc_rid_t revisionId = element.revisionId();
       if (collection->readRevision(trx, mmdr, revisionId)) {
-        uint8_t const* vpack = mmdr.back(); 
         if (useExternals) {
-          builder.addExternal(vpack);
+          builder.addExternal(mmdr.vpack());
         } else {
-          builder.add(VPackSlice(vpack));
+          builder.add(VPackSlice(mmdr.vpack()));
         }
       }
     }

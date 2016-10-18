@@ -82,7 +82,7 @@ class CollectionKeys {
   }
 
   size_t count() const {
-    return _result.size();
+    return _vpack.size();
   }
 
   //////////////////////////////////////////////////////////////////////////////
@@ -119,12 +119,13 @@ class CollectionKeys {
   std::string const _name;
   arangodb::CollectionNameResolver _resolver;
   TRI_voc_tick_t _blockerId;
-  ManagedMultiDocumentResult _result;
   CollectionKeysId _id;
   double _ttl;
   double _expires;
   bool _isDeleted;
   bool _isUsed;
+  std::vector<uint8_t const*> _vpack;
+  std::unordered_set<RevisionCacheChunk*> _chunks;
 };
 }
 

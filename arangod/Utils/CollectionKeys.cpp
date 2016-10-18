@@ -32,6 +32,7 @@
 #include "VocBase/DatafileHelper.h"
 #include "VocBase/Ditch.h"
 #include "VocBase/LogicalCollection.h"
+#include "VocBase/RevisionCacheChunk.h"
 #include "VocBase/ticks.h"
 #include "VocBase/vocbase.h"
 #include "Wal/LogfileManager.h"
@@ -50,7 +51,6 @@ CollectionKeys::CollectionKeys(TRI_vocbase_t* vocbase, std::string const& name,
       _name(name),
       _resolver(vocbase),
       _blockerId(blockerId),
-      _result(nullptr),
       _id(0),
       _ttl(ttl),
       _expires(0.0),
@@ -76,6 +76,10 @@ CollectionKeys::~CollectionKeys() {
   if (_ditch != nullptr) {
     _ditch->ditches()->freeDocumentDitch(_ditch, false);
   }
+  
+  for (auto& chunk : _chunks) {
+    chunk->release();
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -97,7 +101,7 @@ void CollectionKeys::create(TRI_voc_tick_t maxTick) {
     THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
   }
 
-  _result.reserve(16384);
+  _vpack.reserve(16384);
 
   // copy all datafile markers into the result under the read-lock
   {
@@ -111,16 +115,22 @@ void CollectionKeys::create(TRI_voc_tick_t maxTick) {
       THROW_ARANGO_EXCEPTION(res);
     }
 
+    ManagedDocumentResult mmdr(&trx);
     trx.invokeOnAllElements(
-        _collection->name(), [this, &trx, &maxTick](SimpleIndexElement const& element) {
-          _collection->readRevisionConditional(&trx, _result, element.revisionId(), maxTick, true);
+        _collection->name(), [this, &trx, &maxTick, &mmdr](SimpleIndexElement const& element) {
+          if (_collection->readRevisionConditional(&trx, mmdr, element.revisionId(), maxTick, true)) {
+            _vpack.emplace_back(mmdr.vpack());
+          }
           return true;
         });
+
+    trx.transactionContext()->stealChunks(_chunks);
+
     trx.finish(res);
   }
 
   // now sort all markers without the read-lock
-  std::sort(_result.begin(), _result.end(),
+  std::sort(_vpack.begin(), _vpack.end(),
             [](uint8_t const* lhs, uint8_t const* rhs) -> bool {
     return (StringRef(Transaction::extractKeyFromDocument(VPackSlice(lhs))) < StringRef(Transaction::extractKeyFromDocument(VPackSlice(rhs))));
   });
@@ -132,13 +142,13 @@ void CollectionKeys::create(TRI_voc_tick_t maxTick) {
 
 std::tuple<std::string, std::string, uint64_t> CollectionKeys::hashChunk(
     size_t from, size_t to) const {
-  if (from >= _result.size() || to > _result.size() || from >= to ||
+  if (from >= _vpack.size() || to > _vpack.size() || from >= to ||
       to == 0) {
     THROW_ARANGO_EXCEPTION(TRI_ERROR_BAD_PARAMETER);
   }
 
-  VPackSlice first(_result.at(from));
-  VPackSlice last(_result.at(to - 1));
+  VPackSlice first(_vpack.at(from));
+  VPackSlice last(_vpack.at(to - 1));
 
   TRI_ASSERT(first.isObject());
   TRI_ASSERT(last.isObject());
@@ -146,7 +156,7 @@ std::tuple<std::string, std::string, uint64_t> CollectionKeys::hashChunk(
   uint64_t hash = 0x012345678;
 
   for (size_t i = from; i < to; ++i) {
-    VPackSlice current(_result.at(i));
+    VPackSlice current(_vpack.at(i));
     TRI_ASSERT(current.isObject());
 
     // we can get away with the fast hash function here, as key values are 
@@ -170,16 +180,16 @@ void CollectionKeys::dumpKeys(VPackBuilder& result, size_t chunk,
   size_t from = chunk * chunkSize;
   size_t to = (chunk + 1) * chunkSize;
 
-  if (to > _result.size()) {
-    to = _result.size();
+  if (to > _vpack.size()) {
+    to = _vpack.size();
   }
 
-  if (from >= _result.size() || from >= to || to == 0) {
+  if (from >= _vpack.size() || from >= to || to == 0) {
     THROW_ARANGO_EXCEPTION(TRI_ERROR_BAD_PARAMETER);
   }
   
   for (size_t i = from; i < to; ++i) {
-    VPackSlice current(_result.at(i));
+    VPackSlice current(_vpack.at(i));
     TRI_ASSERT(current.isObject());
 
     result.openArray();
@@ -206,11 +216,11 @@ void CollectionKeys::dumpDocs(arangodb::velocypack::Builder& result, size_t chun
 
     size_t position = chunk * chunkSize + it.getNumber<size_t>();
 
-    if (position >= _result.size()) {
+    if (position >= _vpack.size()) {
       THROW_ARANGO_EXCEPTION(TRI_ERROR_BAD_PARAMETER);
     }
     
-    VPackSlice current(_result.at(position));
+    VPackSlice current(_vpack.at(position));
     TRI_ASSERT(current.isObject());
   
     result.add(current);

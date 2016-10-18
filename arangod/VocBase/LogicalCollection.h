@@ -56,7 +56,6 @@ class FollowerInfo;
 class Index;
 class KeyGenerator;
 class ManagedDocumentResult;
-class ManagedMultiDocumentResult;
 struct OperationOptions;
 class PhysicalCollection;
 class PrimaryIndex;
@@ -376,8 +375,7 @@ class LogicalCollection {
   int endWrite(bool useDeadlockDetector);
   
   bool readRevision(arangodb::Transaction*, ManagedDocumentResult& result, TRI_voc_rid_t revisionId);
-  bool readRevision(arangodb::Transaction*, ManagedMultiDocumentResult& result, TRI_voc_rid_t revisionId);
-  bool readRevisionConditional(arangodb::Transaction*, ManagedMultiDocumentResult& result, TRI_voc_rid_t revisionId, TRI_voc_tick_t maxTick, bool excludeWal);
+  bool readRevisionConditional(arangodb::Transaction*, ManagedDocumentResult& result, TRI_voc_rid_t revisionId, TRI_voc_tick_t maxTick, bool excludeWal);
 
   void insertRevision(TRI_voc_rid_t revisionId, uint8_t const* dataptr, TRI_voc_fid_t fid, bool isInWal);
   void updateRevision(TRI_voc_rid_t revisionId, uint8_t const* dataptr, TRI_voc_fid_t fid, bool isInWal);

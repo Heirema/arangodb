@@ -380,11 +380,10 @@ static void JS_ChecksumCollection(
   std::string const revisionId = std::to_string(physical->revision());
   uint64_t hash = 0;
         
-  ManagedMultiDocumentResult mmdr(&trx);
+  ManagedDocumentResult mmdr(&trx);
   trx.invokeOnAllElements(col->name(), [&hash, &withData, &withRevisions, &trx, &collection, &mmdr](SimpleIndexElement const& element) {
     collection->readRevision(&trx, mmdr, element.revisionId());
-    uint8_t const* vpack = mmdr.back();
-    VPackSlice const slice(vpack);
+    VPackSlice const slice(mmdr.vpack());
 
     uint64_t localHash = Transaction::extractKeyFromDocument(slice).hashString(); 
 
