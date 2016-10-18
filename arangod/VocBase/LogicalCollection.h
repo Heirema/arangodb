@@ -475,10 +475,8 @@ class LogicalCollection {
 
   void increaseInternalVersion();
 
-  void toVelocyPackInObject(arangodb::velocypack::Builder& result) const;
-
  protected:
-  // SECTION: Private variables
+  void toVelocyPackInObject(arangodb::velocypack::Builder& result) const;
 
   // SECTION: Meta Information
   //
