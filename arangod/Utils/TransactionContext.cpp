@@ -177,16 +177,17 @@ DocumentDitch* TransactionContext::ditch(TRI_voc_cid_t cid) const {
 void TransactionContext::addChunk(RevisionCacheChunk* chunk) {
   TRI_ASSERT(chunk != nullptr);
 
-  MUTEX_LOCKER(locker, _chunksLock);
-
-  auto it = _chunks.find(chunk);
-  if (it == _chunks.end()) {
-    // insert the chunk here
-    _chunks.emplace(chunk);
-  } else {
-    // already saw this chunk
-    chunk->release();
+  {
+    MUTEX_LOCKER(locker, _chunksLock);
+    if (_chunks.emplace(chunk).second) {
+      // we're the first ones to insert this chunk
+      return;
+    }
   }
+    
+  // another thread had inserted the same chunk already
+  // now need to keep track of it twice
+  chunk->release();
 }
 
 //////////////////////////////////////////////////////////////////////////////
