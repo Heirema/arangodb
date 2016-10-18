@@ -452,7 +452,7 @@ AqlValue Expression::executeSimpleExpression(
     case NODE_TYPE_OBJECT:
       return executeSimpleExpressionObject(node, trx, mustDestroy);
     case NODE_TYPE_VALUE:
-      return executeSimpleExpressionValue(node, mustDestroy);
+      return executeSimpleExpressionValue(node, trx, mustDestroy);
     case NODE_TYPE_REFERENCE:
       return executeSimpleExpressionReference(node, trx, mustDestroy, doCopy);
     case NODE_TYPE_FCALL:
@@ -630,7 +630,7 @@ AqlValue Expression::executeSimpleExpressionArray(
   mustDestroy = false;
   if (node->isConstant()) {
     // this will not create a copy
-    return AqlValue(node->computeValue().begin()); 
+    return AqlValue(node->computeValue(trx).begin()); 
   }
 
   size_t const n = node->numMembers();
@@ -664,7 +664,7 @@ AqlValue Expression::executeSimpleExpressionObject(
   mustDestroy = false;
   if (node->isConstant()) {
     // this will not create a copy
-    return AqlValue(node->computeValue().begin()); 
+    return AqlValue(node->computeValue(trx).begin()); 
   }
   
   size_t const n = node->numMembers();
@@ -799,10 +799,11 @@ AqlValue Expression::executeSimpleExpressionObject(
 
 /// @brief execute an expression of type SIMPLE with VALUE
 AqlValue Expression::executeSimpleExpressionValue(AstNode const* node,
+                                                  arangodb::Transaction* trx,
                                                   bool& mustDestroy) {
   // this will not create a copy
   mustDestroy = false;
-  return AqlValue(node->computeValue().begin()); 
+  return AqlValue(node->computeValue(trx).begin()); 
 }
 
 /// @brief execute an expression of type SIMPLE with REFERENCE

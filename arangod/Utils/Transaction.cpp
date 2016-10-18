@@ -172,7 +172,7 @@ static void createBabiesError(VPackBuilder& builder,
 bool Transaction::sortOrs(arangodb::aql::Ast* ast,
                     arangodb::aql::AstNode* root,
                     arangodb::aql::Variable const* variable,
-                    std::vector<arangodb::Transaction::IndexHandle>& usedIndexes) const {
+                    std::vector<arangodb::Transaction::IndexHandle>& usedIndexes) {
   if (root == nullptr) {
     return true;
   }
@@ -304,7 +304,7 @@ bool Transaction::sortOrs(arangodb::aql::Ast* ast,
         // merge IN with IN
         TRI_ASSERT(previousIn < i);
         auto emptyArray = ast->createNodeArray();
-        auto mergedIn = ast->createNodeUnionizedArray(
+        auto mergedIn = ast->createNodeUnionizedArray(this,
             parts[previousIn].valueNode, p.valueNode);
         parts[previousIn].valueNode = mergedIn;
         parts[i].valueNode = emptyArray;

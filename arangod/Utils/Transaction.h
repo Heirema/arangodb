@@ -859,7 +859,7 @@ class Transaction {
   bool sortOrs(arangodb::aql::Ast* ast,
                arangodb::aql::AstNode* root,
                arangodb::aql::Variable const* variable,
-               std::vector<arangodb::Transaction::IndexHandle>& usedIndexes) const;
+               std::vector<arangodb::Transaction::IndexHandle>& usedIndexes);
 
   //////////////////////////////////////////////////////////////////////////////
   /// @brief findIndexHandleForAndNode

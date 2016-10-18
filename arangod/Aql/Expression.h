@@ -247,7 +247,9 @@ class Expression {
                                          bool& mustDestroy);
 
   /// @brief execute an expression of type SIMPLE with VALUE
-  AqlValue executeSimpleExpressionValue(AstNode const*, bool& mustDestroy);
+  AqlValue executeSimpleExpressionValue(AstNode const*, 
+                                        arangodb::Transaction*,
+                                        bool& mustDestroy);
 
   /// @brief execute an expression of type SIMPLE with REFERENCE
   AqlValue executeSimpleExpressionReference(AstNode const*,
