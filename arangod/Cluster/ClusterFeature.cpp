@@ -488,9 +488,8 @@ void ClusterFeature::unprepare() {
     }
   }
 
-  ClusterComm::cleanup();
-
   if (!_enableCluster) {
+    ClusterComm::cleanup();
     return;
   }
 
@@ -526,9 +525,9 @@ void ClusterFeature::unprepare() {
   while (_heartbeatThread->isRunning()) {
     usleep(50000);
   }
-
-  // ClusterComm::cleanup();
+    
   AgencyComm::cleanup();
+  ClusterComm::cleanup();
 }
 
 void ClusterFeature::setUnregisterOnShutdown(bool unregisterOnShutdown) {
