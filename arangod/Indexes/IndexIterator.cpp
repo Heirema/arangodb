@@ -40,6 +40,7 @@ IndexIterator::IndexIterator(LogicalCollection* collection,
         _responsible(mmdr == nullptr) {
   TRI_ASSERT(_collection != nullptr);
   TRI_ASSERT(_trx != nullptr);
+  TRI_ASSERT(_mmdr != nullptr);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -1467,7 +1467,9 @@ int Transaction::documentFastPath(std::string const& collectionName,
   if (mmdr == nullptr) {
     tmp.reset(new ManagedDocumentResult(this));
     mmdr = tmp.get();
-  } 
+  }
+  
+  TRI_ASSERT(mmdr != nullptr); 
 
   int res = collection->read(this, key, *mmdr,
       shouldLock && !isLocked(collection, TRI_TRANSACTION_READ));
