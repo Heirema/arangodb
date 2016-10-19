@@ -65,6 +65,7 @@ SingleServerEdgeCursor::SingleServerEdgeCursor(ManagedDocumentResult* mmdr,
       _currentSubCursor(0),
       _cachePos(0),
       _internalCursorMapping(mapping) {
+  TRI_ASSERT(_mmdr != nullptr);
   _cursors.reserve(nrCursors);
   _cache.reserve(1000);
 };

@@ -75,6 +75,7 @@ TraversalBlock::TraversalBlock(ExecutionEngine* engine, TraversalNode const* ep)
     if (node->isSmart()) {
       _traverser.reset(new arangodb::traverser::SmartGraphTraverser(
           _opts,
+          _mmdr.get(),
           ep->engines(),
           _trx->vocbase()->name(),
           _trx));
@@ -82,6 +83,7 @@ TraversalBlock::TraversalBlock(ExecutionEngine* engine, TraversalNode const* ep)
 #endif
       _traverser.reset(new arangodb::traverser::ClusterTraverser(
           _opts,
+          _mmdr.get(),
           ep->engines(),
           _trx->vocbase()->name(),
           _trx));

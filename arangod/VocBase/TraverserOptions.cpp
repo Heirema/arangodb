@@ -586,6 +586,7 @@ arangodb::traverser::TraverserOptions::nextCursor(ManagedDocumentResult* mmdr,
   if (arangodb::ServerState::instance()->isCoordinator()) {
     return nextCursorCoordinator(vertex, depth);
   }
+  TRI_ASSERT(mmdr != nullptr);
   auto specific = _depthLookupInfo.find(depth);
   std::vector<LookupInfo> list;
   if (specific != _depthLookupInfo.end()) {
@@ -599,6 +600,7 @@ arangodb::traverser::TraverserOptions::nextCursor(ManagedDocumentResult* mmdr,
 arangodb::traverser::EdgeCursor*
 arangodb::traverser::TraverserOptions::nextCursorLocal(ManagedDocumentResult* mmdr,
     VPackSlice vertex, size_t depth, std::vector<LookupInfo>& list) const {
+  TRI_ASSERT(mmdr != nullptr);
   auto allCursor = std::make_unique<SingleServerEdgeCursor>(mmdr, _trx, list.size());
   auto& opCursors = allCursor->getCursors();
   VPackValueLength vidLength;
