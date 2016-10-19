@@ -565,7 +565,9 @@ bool ShortestPathBlock::nextPath(AqlItemBlock const* items) {
 
 AqlItemBlock* ShortestPathBlock::getSome(size_t, size_t atMost) {
   DEBUG_BEGIN_BLOCK();
+  traceGetSomeBegin();
   if (_done) {
+    traceGetSomeEnd(nullptr);
     return nullptr;
   }
 
@@ -573,6 +575,7 @@ AqlItemBlock* ShortestPathBlock::getSome(size_t, size_t atMost) {
     size_t toFetch = (std::min)(DefaultBatchSize(), atMost);
     if (!ExecutionBlock::getBlock(toFetch, toFetch)) {
       _done = true;
+      traceGetSomeEnd(nullptr);
       return nullptr;
     }
     _pos = 0;  // this is in the first block
@@ -592,7 +595,9 @@ AqlItemBlock* ShortestPathBlock::getSome(size_t, size_t atMost) {
         delete cur;
         _pos = 0;
       }
-      return getSome(atMost, atMost);
+      auto r = getSome(atMost, atMost);
+      traceGetSomeEnd(r);
+      return r;
     }
   }
 
@@ -642,6 +647,7 @@ AqlItemBlock* ShortestPathBlock::getSome(size_t, size_t atMost) {
 
   // Clear out registers no longer needed later:
   clearRegisters(res.get());
+  traceGetSomeEnd(res.get());
   return res.release();
 
   // cppcheck-suppress style

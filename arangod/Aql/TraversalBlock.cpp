@@ -336,7 +336,9 @@ void TraversalBlock::initializePaths(AqlItemBlock const* items, size_t pos) {
 AqlItemBlock* TraversalBlock::getSome(size_t,  // atLeast,
                                       size_t atMost) {
   DEBUG_BEGIN_BLOCK();
+  traceGetSomeBegin();
   if (_done) {
+    traceGetSomeEnd(nullptr);
     return nullptr;
   }
 
@@ -344,6 +346,7 @@ AqlItemBlock* TraversalBlock::getSome(size_t,  // atLeast,
     size_t toFetch = (std::min)(DefaultBatchSize(), atMost);
     if (!ExecutionBlock::getBlock(toFetch, toFetch)) {
       _done = true;
+      traceGetSomeEnd(nullptr);
       return nullptr;
     }
     _pos = 0;  // this is in the first block
@@ -371,7 +374,9 @@ AqlItemBlock* TraversalBlock::getSome(size_t,  // atLeast,
       } else {
         initializePaths(cur, _pos);
       }
-      return getSome(atMost, atMost);
+      auto r = getSome(atMost, atMost);
+      traceGetSomeEnd(r);
+      return r;
     }
   }
 
@@ -423,6 +428,7 @@ AqlItemBlock* TraversalBlock::getSome(size_t,  // atLeast,
 
   // Clear out registers no longer needed later:
   clearRegisters(res.get());
+  traceGetSomeEnd(res.get());
   return res.release();
 
   // cppcheck-suppress style
