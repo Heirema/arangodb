@@ -85,7 +85,7 @@ bool RestEdgesHandler::getEdgesForVertexList(
 
   std::unique_ptr<OperationCursor> cursor =
       trx.indexScan(collectionName, arangodb::Transaction::CursorType::INDEX,
-                    indexId, search, 0, UINT64_MAX, 1000, false);
+                    indexId, search, nullptr, 0, UINT64_MAX, 1000, false);
   if (cursor->failed()) {
     THROW_ARANGO_EXCEPTION(cursor->code);
   }
@@ -138,7 +138,7 @@ bool RestEdgesHandler::getEdgesForVertex(
 
   std::unique_ptr<OperationCursor> cursor =
       trx.indexScan(collectionName, arangodb::Transaction::CursorType::INDEX,
-                    indexId, search, 0, UINT64_MAX, 1000, false);
+                    indexId, search, nullptr, 0, UINT64_MAX, 1000, false);
   if (cursor->failed()) {
     THROW_ARANGO_EXCEPTION(cursor->code);
   }

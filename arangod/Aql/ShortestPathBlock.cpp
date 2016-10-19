@@ -620,13 +620,13 @@ AqlItemBlock* ShortestPathBlock::getSome(size_t, size_t atMost) {
     if (usesVertexOutput()) {
       // TODO this might be optimized in favor of direct mptr.
       resultBuilder.clear();
-      _path->vertexToVelocyPack(_trx, _posInPath, resultBuilder);
+      _path->vertexToVelocyPack(_trx, nullptr, _posInPath, resultBuilder);
       res->setValue(j, _vertexReg, AqlValue(resultBuilder.slice()));
     }
     if (usesEdgeOutput()) {
       // TODO this might be optimized in favor of direct mptr.
       resultBuilder.clear();
-      _path->edgeToVelocyPack(_trx, _posInPath, resultBuilder);
+      _path->edgeToVelocyPack(_trx, nullptr, _posInPath, resultBuilder);
       res->setValue(j, _edgeReg, AqlValue(resultBuilder.slice()));
     }
     if (j > 0) {

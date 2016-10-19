@@ -118,10 +118,11 @@ static bool IsEqualElementEdgeByKey(void* userData, SimpleIndexElement const& le
 }
   
 EdgeIndexIterator::EdgeIndexIterator(LogicalCollection* collection, arangodb::Transaction* trx,
+                                     ManagedDocumentResult* mmdr,
                                      arangodb::EdgeIndex const* index,
                                      TRI_EdgeIndexHash_t const* indexImpl,
                                      std::unique_ptr<VPackBuilder>& keys)
-    : IndexIterator(collection, trx, index),
+    : IndexIterator(collection, trx, mmdr, index),
       _index(indexImpl),
       _keys(keys.get()),
       _iterator(_keys->slice()),
@@ -227,10 +228,11 @@ void EdgeIndexIterator::reset() {
   
 AnyDirectionEdgeIndexIterator::AnyDirectionEdgeIndexIterator(LogicalCollection* collection,
                                 arangodb::Transaction* trx,
+                                ManagedDocumentResult* mmdr,
                                 arangodb::EdgeIndex const* index,
                                 EdgeIndexIterator* outboundIterator,
                                 EdgeIndexIterator* inboundIterator)
-    : IndexIterator(collection, trx, index),
+    : IndexIterator(collection, trx, mmdr, index),
       _outbound(outboundIterator),
       _inbound(inboundIterator),
       _useInbound(false) {}
@@ -622,6 +624,7 @@ bool EdgeIndex::supportsFilterCondition(
 
 IndexIterator* EdgeIndex::iteratorForCondition(
     arangodb::Transaction* trx, 
+    ManagedDocumentResult* mmdr,
     arangodb::aql::AstNode const* node,
     arangodb::aql::Variable const* reference, bool reverse) const {
   TRI_ASSERT(node->type == aql::NODE_TYPE_OPERATOR_NARY_AND);
@@ -643,7 +646,7 @@ IndexIterator* EdgeIndex::iteratorForCondition(
 
   if (comp->type == aql::NODE_TYPE_OPERATOR_BINARY_EQ) {
     // a.b == value
-    return createEqIterator(trx, attrNode, valNode);
+    return createEqIterator(trx, mmdr, attrNode, valNode);
   }
 
   if (comp->type == aql::NODE_TYPE_OPERATOR_BINARY_IN) {
@@ -652,7 +655,7 @@ IndexIterator* EdgeIndex::iteratorForCondition(
       return nullptr;
     }
 
-    return createInIterator(trx, attrNode, valNode);
+    return createInIterator(trx, mmdr, attrNode, valNode);
   }
 
   // operator type unsupported
@@ -727,6 +730,7 @@ void EdgeIndex::expandInSearchValues(VPackSlice const slice,
 
 IndexIterator* EdgeIndex::iteratorForSlice(
     arangodb::Transaction* trx, 
+    ManagedDocumentResult* mmdr,
     arangodb::velocypack::Slice const searchValues, bool) const {
   if (!searchValues.isArray() || searchValues.length() != 2) {
     // Invalid searchValue
@@ -743,27 +747,27 @@ IndexIterator* EdgeIndex::iteratorForSlice(
       TransactionBuilderLeaser fromBuilder(trx);
       std::unique_ptr<VPackBuilder> fromKeys(fromBuilder.steal());
       fromKeys->add(from);
-      auto left = std::make_unique<EdgeIndexIterator>(_collection, trx, this, _edgesFrom, fromKeys);
+      auto left = std::make_unique<EdgeIndexIterator>(_collection, trx, mmdr, this, _edgesFrom, fromKeys);
 
       TransactionBuilderLeaser toBuilder(trx);
       std::unique_ptr<VPackBuilder> toKeys(toBuilder.steal());
       toKeys->add(to);
-      auto right = std::make_unique<EdgeIndexIterator>(_collection, trx, this, _edgesTo, toKeys);
-      return new AnyDirectionEdgeIndexIterator(_collection, trx, this, left.release(), right.release());
+      auto right = std::make_unique<EdgeIndexIterator>(_collection, trx, mmdr, this, _edgesTo, toKeys);
+      return new AnyDirectionEdgeIndexIterator(_collection, trx, mmdr, this, left.release(), right.release());
     }
     // OUTBOUND search
     TRI_ASSERT(to.isNull());
     TransactionBuilderLeaser builder(trx);
     std::unique_ptr<VPackBuilder> keys(builder.steal());
     keys->add(from);
-    return new EdgeIndexIterator(_collection, trx, this, _edgesFrom, keys);
+    return new EdgeIndexIterator(_collection, trx, mmdr, this, _edgesFrom, keys);
   } else {
     // INBOUND search
     TRI_ASSERT(to.isArray());
     TransactionBuilderLeaser builder(trx);
     std::unique_ptr<VPackBuilder> keys(builder.steal());
     keys->add(to);
-    return new EdgeIndexIterator(_collection, trx, this, _edgesTo, keys);
+    return new EdgeIndexIterator(_collection, trx, mmdr, this, _edgesTo, keys);
   }
 }
 
@@ -773,6 +777,7 @@ IndexIterator* EdgeIndex::iteratorForSlice(
 
 IndexIterator* EdgeIndex::createEqIterator(
     arangodb::Transaction* trx, 
+    ManagedDocumentResult* mmdr,
     arangodb::aql::AstNode const* attrNode,
     arangodb::aql::AstNode const* valNode) const {
   
@@ -790,7 +795,7 @@ IndexIterator* EdgeIndex::createEqIterator(
   // _from or _to?
   bool const isFrom = (attrNode->stringEquals(StaticStrings::FromString));
 
-  return new EdgeIndexIterator(_collection, trx, this, isFrom ? _edgesFrom : _edgesTo, keys);
+  return new EdgeIndexIterator(_collection, trx, mmdr, this, isFrom ? _edgesFrom : _edgesTo, keys);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -799,6 +804,7 @@ IndexIterator* EdgeIndex::createEqIterator(
 
 IndexIterator* EdgeIndex::createInIterator(
     arangodb::Transaction* trx, 
+    ManagedDocumentResult* mmdr,
     arangodb::aql::AstNode const* attrNode,
     arangodb::aql::AstNode const* valNode) const {
   
@@ -823,7 +829,7 @@ IndexIterator* EdgeIndex::createInIterator(
   // _from or _to?
   bool const isFrom = (attrNode->stringEquals(StaticStrings::FromString));
 
-  return new EdgeIndexIterator(_collection, trx, this, isFrom ? _edgesFrom : _edgesTo, keys);
+  return new EdgeIndexIterator(_collection, trx, mmdr, this, isFrom ? _edgesFrom : _edgesTo, keys);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

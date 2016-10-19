@@ -29,8 +29,15 @@
 
 using namespace arangodb;
   
-IndexIterator::IndexIterator(LogicalCollection* collection, arangodb::Transaction* trx, arangodb::Index const* index)
-      : _collection(collection), _trx(trx), _mmdr(trx), _context(trx, collection, &_mmdr, index->fields().size()) {
+IndexIterator::IndexIterator(LogicalCollection* collection, 
+                             arangodb::Transaction* trx, 
+                             ManagedDocumentResult* mmdr, 
+                             arangodb::Index const* index)
+      : _collection(collection), 
+        _trx(trx), 
+        _mmdr(mmdr ? mmdr : new ManagedDocumentResult(trx)), 
+        _context(trx, collection, _mmdr, index->fields().size()),
+        _responsible(mmdr == nullptr) {
   TRI_ASSERT(_collection != nullptr);
   TRI_ASSERT(_trx != nullptr);
 }
@@ -39,7 +46,11 @@ IndexIterator::IndexIterator(LogicalCollection* collection, arangodb::Transactio
 /// @brief default destructor. Does not free anything
 ////////////////////////////////////////////////////////////////////////////////
 
-IndexIterator::~IndexIterator() {}
+IndexIterator::~IndexIterator() {
+  if (_responsible) {
+    delete _mmdr;
+  }
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief default implementation for next

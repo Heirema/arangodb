@@ -96,7 +96,7 @@ int MMFilesCollection::OpenIteratorHandleDocumentMarker(TRI_df_marker_t const* m
 
   // no primary index lock required here because we are the only ones reading
   // from the index ATM
-  SimpleIndexElement* found = primaryIndex->lookupKeyRef(trx, keySlice);
+  SimpleIndexElement* found = primaryIndex->lookupKeyRef(trx, keySlice, state->_mmdr);
 
   // it is a new entry
   if (found == nullptr || found->revisionId() == 0) {
@@ -189,7 +189,7 @@ int MMFilesCollection::OpenIteratorHandleDeletionMarker(TRI_df_marker_t const* m
   // no primary index lock required here because we are the only ones reading
   // from the index ATM
   auto primaryIndex = collection->primaryIndex();
-  SimpleIndexElement found = primaryIndex->lookupKey(trx, keySlice);
+  SimpleIndexElement found = primaryIndex->lookupKey(trx, keySlice, state->_mmdr);
 
   // it is a new entry, so we missed the create
   if (!found) {

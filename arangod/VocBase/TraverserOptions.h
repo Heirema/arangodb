@@ -29,6 +29,7 @@
 #include "Utils/Transaction.h"
 
 namespace arangodb {
+class ManagedDocumentResult;
 
 namespace velocypack {
 class Builder;
@@ -153,7 +154,7 @@ struct TraverserOptions {
 
   bool evaluateVertexExpression(arangodb::velocypack::Slice, size_t) const;
 
-  EdgeCursor* nextCursor(arangodb::velocypack::Slice, size_t) const;
+  EdgeCursor* nextCursor(ManagedDocumentResult*, arangodb::velocypack::Slice, size_t) const;
 
   void clearVariableValues();
 
@@ -164,7 +165,8 @@ struct TraverserOptions {
   void serializeVariables(arangodb::velocypack::Builder&) const;
 
  private:
-  EdgeCursor* nextCursorLocal(arangodb::velocypack::Slice, size_t,
+  EdgeCursor* nextCursorLocal(ManagedDocumentResult*,
+                              arangodb::velocypack::Slice, size_t,
                               std::vector<LookupInfo>&) const;
 
   EdgeCursor* nextCursorCoordinator(arangodb::velocypack::Slice, size_t) const;

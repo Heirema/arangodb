@@ -46,6 +46,7 @@ class PrimaryIndexIterator final : public IndexIterator {
  public:
   PrimaryIndexIterator(LogicalCollection* collection,
                        arangodb::Transaction* trx, 
+                       ManagedDocumentResult* mmdr,
                        PrimaryIndex const* index,
                        std::unique_ptr<VPackBuilder>& keys);
 
@@ -67,6 +68,7 @@ class AllIndexIterator final : public IndexIterator {
  public:
   AllIndexIterator(LogicalCollection* collection,
                    arangodb::Transaction* trx, 
+                   ManagedDocumentResult* mmdr,
                    PrimaryIndex const* index,
                    PrimaryIndexImpl const* indexImpl,
                    bool reverse);
@@ -91,6 +93,7 @@ class AllIndexIterator final : public IndexIterator {
 class AnyIndexIterator final : public IndexIterator {
  public:
   AnyIndexIterator(LogicalCollection* collection, arangodb::Transaction* trx, 
+                   ManagedDocumentResult* mmdr,
                    PrimaryIndex const* index,
                    PrimaryIndexImpl const* indexImpl);
 
@@ -149,7 +152,9 @@ class PrimaryIndex final : public Index {
   int unload() override;
 
   SimpleIndexElement lookupKey(arangodb::Transaction*, VPackSlice const&) const;
+  SimpleIndexElement lookupKey(arangodb::Transaction*, VPackSlice const&, ManagedDocumentResult&) const;
   SimpleIndexElement* lookupKeyRef(arangodb::Transaction*, VPackSlice const&) const;
+  SimpleIndexElement* lookupKeyRef(arangodb::Transaction*, VPackSlice const&, ManagedDocumentResult&) const;
 
   //////////////////////////////////////////////////////////////////////////////
   /// @brief a method to iterate over all elements in the index in
@@ -168,7 +173,7 @@ class PrimaryIndex final : public Index {
   ///        a sequential order.
   //////////////////////////////////////////////////////////////////////////////
 
-  IndexIterator* allIterator(arangodb::Transaction*, bool) const;
+  IndexIterator* allIterator(arangodb::Transaction*, ManagedDocumentResult*, bool reverse) const;
 
   //////////////////////////////////////////////////////////////////////////////
   /// @brief request an iterator over all elements in the index in
@@ -176,7 +181,7 @@ class PrimaryIndex final : public Index {
   ///        exactly once unless the collection is modified.
   //////////////////////////////////////////////////////////////////////////////
 
-  IndexIterator* anyIterator(arangodb::Transaction*) const;
+  IndexIterator* anyIterator(arangodb::Transaction*, ManagedDocumentResult*) const;
 
   //////////////////////////////////////////////////////////////////////////////
   /// @brief a method to iterate over all elements in the index in
@@ -203,11 +208,13 @@ class PrimaryIndex final : public Index {
                                double&) const override;
 
   IndexIterator* iteratorForCondition(arangodb::Transaction*,
+                                      ManagedDocumentResult*,
                                       arangodb::aql::AstNode const*,
                                       arangodb::aql::Variable const*,
                                       bool) const override;
 
   IndexIterator* iteratorForSlice(arangodb::Transaction*, 
+                                  ManagedDocumentResult*,
                                   arangodb::velocypack::Slice const,
                                   bool) const override;
 
@@ -217,18 +224,12 @@ class PrimaryIndex final : public Index {
  private:
 
   //////////////////////////////////////////////////////////////////////////////
-  /// @brief looks up an element given a request Slice. The slice has to be
-  ///        of type string.
-  //////////////////////////////////////////////////////////////////////////////
-
-  SimpleIndexElement lookup(arangodb::Transaction*, VPackSlice const&) const;
-
-  //////////////////////////////////////////////////////////////////////////////
   /// @brief create the iterator, for a single attribute, IN operator
   //////////////////////////////////////////////////////////////////////////////
 
   IndexIterator* createInIterator(
       arangodb::Transaction*, 
+      ManagedDocumentResult*,
       arangodb::aql::AstNode const*,
       arangodb::aql::AstNode const*) const;
 
@@ -238,6 +239,7 @@ class PrimaryIndex final : public Index {
   
   IndexIterator* createEqIterator(
       arangodb::Transaction*, 
+      ManagedDocumentResult*,
       arangodb::aql::AstNode const*,
       arangodb::aql::AstNode const*) const;
 

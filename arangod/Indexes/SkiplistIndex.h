@@ -186,6 +186,7 @@ class SkiplistIterator final : public IndexIterator {
 
  public:
   SkiplistIterator(LogicalCollection* collection, arangodb::Transaction* trx,
+                   ManagedDocumentResult* mmdr,
                    arangodb::SkiplistIndex const* index,
                    bool reverse, Node* left, Node* right);
 
@@ -249,6 +250,7 @@ class SkiplistIterator2 final : public IndexIterator {
 
  public:
   SkiplistIterator2(LogicalCollection* collection, arangodb::Transaction* trx,
+      ManagedDocumentResult* mmdr,
       arangodb::SkiplistIndex const* index,
       TRI_Skiplist const* skiplist, size_t numPaths,
       std::function<int(void*, SkiplistIndexElement const*, SkiplistIndexElement const*,
@@ -369,16 +371,6 @@ class SkiplistIndex final : public PathBasedIndex {
   
   int unload() override;
 
-  //////////////////////////////////////////////////////////////////////////////
-  /// @brief attempts to locate an entry in the skip list index
-  ///
-  /// Warning: who ever calls this function is responsible for destroying
-  /// the velocypack::Slice and the SkiplistIterator* results
-  //////////////////////////////////////////////////////////////////////////////
-
-  IndexIterator* lookup(arangodb::Transaction*, arangodb::velocypack::Slice const,
-                        bool) const;
-
   bool supportsFilterCondition(arangodb::aql::AstNode const*,
                                arangodb::aql::Variable const*, size_t, size_t&,
                                double&) const override;
@@ -388,6 +380,7 @@ class SkiplistIndex final : public PathBasedIndex {
                              double&, size_t&) const override;
 
   IndexIterator* iteratorForCondition(arangodb::Transaction*,
+                                      ManagedDocumentResult*,
                                       arangodb::aql::AstNode const*,
                                       arangodb::aql::Variable const*,
                                       bool) const override;

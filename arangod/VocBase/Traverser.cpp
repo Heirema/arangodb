@@ -43,7 +43,8 @@ void arangodb::traverser::ShortestPath::clear() {
   _edges.clear();
 }
 
-void arangodb::traverser::ShortestPath::edgeToVelocyPack(Transaction*, size_t position, VPackBuilder& builder) {
+void arangodb::traverser::ShortestPath::edgeToVelocyPack(Transaction*, ManagedDocumentResult* mmdr,
+                                                         size_t position, VPackBuilder& builder) {
   TRI_ASSERT(position < length());
   if (position == 0) {
     builder.add(basics::VelocyPackHelper::NullValue());
@@ -53,7 +54,8 @@ void arangodb::traverser::ShortestPath::edgeToVelocyPack(Transaction*, size_t po
   }
 }
 
-void arangodb::traverser::ShortestPath::vertexToVelocyPack(Transaction* trx, size_t position, VPackBuilder& builder) {
+void arangodb::traverser::ShortestPath::vertexToVelocyPack(Transaction* trx, ManagedDocumentResult* mmdr, 
+                                                           size_t position, VPackBuilder& builder) {
   TRI_ASSERT(position < length());
   VPackSlice v = _vertices[position];
   TRI_ASSERT(v.isString());
@@ -66,7 +68,7 @@ void arangodb::traverser::ShortestPath::vertexToVelocyPack(Transaction* trx, siz
   collection = collection.substr(0, p);
 
   int res =
-      trx->documentFastPath(collection, searchBuilder->slice(), builder, true);
+      trx->documentFastPath(collection, mmdr, searchBuilder->slice(), builder, true);
   if (res != TRI_ERROR_NO_ERROR) {
     builder.clear(); // Just in case...
     builder.add(basics::VelocyPackHelper::NullValue());
@@ -334,8 +336,10 @@ void Traverser::UniqueVertexGetter::reset(VPackSlice startVertex) {
   _returnedVertices.emplace(startVertex);
 }
 
-Traverser::Traverser(arangodb::traverser::TraverserOptions* opts, arangodb::Transaction* trx)
+Traverser::Traverser(arangodb::traverser::TraverserOptions* opts, arangodb::Transaction* trx,
+                     ManagedDocumentResult* mmdr)
     : _trx(trx),
+      _mmdr(mmdr),
       _startIdBuilder(trx),
       _readDocuments(0),
       _filteredPaths(0),

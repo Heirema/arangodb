@@ -66,7 +66,7 @@ std::unique_ptr<arangodb::OperationCursor> EdgeCollectionInfo::getEdges(
   EdgeIndex::buildSearchValue(_forwardDir, vertexId, _searchBuilder);
   return _trx->indexScan(_collectionName,
                          arangodb::Transaction::CursorType::INDEX, _indexId,
-                         _searchBuilder.slice(), 0, UINT64_MAX, 1000, false);
+                         _searchBuilder.slice(), nullptr,0, UINT64_MAX, 1000, false);
 }
 
 std::unique_ptr<arangodb::OperationCursor> EdgeCollectionInfo::getEdges(
@@ -75,7 +75,7 @@ std::unique_ptr<arangodb::OperationCursor> EdgeCollectionInfo::getEdges(
   EdgeIndex::buildSearchValue(_forwardDir, vertexId, _searchBuilder);
   return _trx->indexScan(_collectionName,
                          arangodb::Transaction::CursorType::INDEX, _indexId,
-                         _searchBuilder.slice(), 0, UINT64_MAX, 1000, false);
+                         _searchBuilder.slice(), nullptr, 0, UINT64_MAX, 1000, false);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -104,7 +104,7 @@ std::unique_ptr<arangodb::OperationCursor> EdgeCollectionInfo::getReverseEdges(
   EdgeIndex::buildSearchValue(_backwardDir, vertexId, _searchBuilder);
   return _trx->indexScan(_collectionName,
                          arangodb::Transaction::CursorType::INDEX, _indexId,
-                         _searchBuilder.slice(), 0, UINT64_MAX, 1000, false);
+                         _searchBuilder.slice(), nullptr, 0, UINT64_MAX, 1000, false);
 }
 
 std::unique_ptr<arangodb::OperationCursor> EdgeCollectionInfo::getReverseEdges(
@@ -113,7 +113,7 @@ std::unique_ptr<arangodb::OperationCursor> EdgeCollectionInfo::getReverseEdges(
   EdgeIndex::buildSearchValue(_backwardDir, vertexId, _searchBuilder);
   return _trx->indexScan(_collectionName,
                          arangodb::Transaction::CursorType::INDEX, _indexId,
-                         _searchBuilder.slice(), 0, UINT64_MAX, 1000, false);
+                         _searchBuilder.slice(), nullptr, 0, UINT64_MAX, 1000, false);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

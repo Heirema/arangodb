@@ -3012,7 +3012,7 @@ int LogicalCollection::lookupDocument(
     return TRI_ERROR_ARANGO_DOCUMENT_KEY_BAD;
   }
 
-  SimpleIndexElement element = primaryIndex()->lookupKey(trx, key);
+  SimpleIndexElement element = primaryIndex()->lookupKey(trx, key, result);
   if (element) {
     readRevision(trx, result, element.revisionId());
     return TRI_ERROR_NO_ERROR;

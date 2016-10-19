@@ -36,10 +36,7 @@
 namespace arangodb {
 
 class LogicalCollection;
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief Forward Declarations
-////////////////////////////////////////////////////////////////////////////////
+class ManagedDocumentResult;
 
 namespace velocypack {
 class Builder;
@@ -267,11 +264,13 @@ class Index {
                                      double&, size_t&) const;
 
   virtual IndexIterator* iteratorForCondition(arangodb::Transaction*,
+                                              ManagedDocumentResult*,
                                               arangodb::aql::AstNode const*,
                                               arangodb::aql::Variable const*,
                                               bool) const;
 
   virtual IndexIterator* iteratorForSlice(arangodb::Transaction*,
+                                          ManagedDocumentResult*,
                                           arangodb::velocypack::Slice const,
                                           bool) const {
     THROW_ARANGO_EXCEPTION(TRI_ERROR_NOT_IMPLEMENTED);

@@ -35,6 +35,7 @@ namespace arangodb {
 
 class EdgeIndex;
 class LogicalCollection;
+class ManagedDocumentResult;
 
 namespace traverser {
 
@@ -43,6 +44,7 @@ class PathEnumerator;
 class SingleServerEdgeCursor : public EdgeCursor {
  private:
   arangodb::Transaction* _trx;
+  ManagedDocumentResult* _mmdr;
   std::vector<std::vector<OperationCursor*>> _cursors;
   size_t _currentCursor;
   size_t _currentSubCursor;
@@ -51,7 +53,7 @@ class SingleServerEdgeCursor : public EdgeCursor {
   std::vector<size_t> const* _internalCursorMapping;
 
  public:
-  SingleServerEdgeCursor(arangodb::Transaction* trx, size_t, std::vector<size_t> const* mapping = nullptr);
+  SingleServerEdgeCursor(ManagedDocumentResult* mmdr, arangodb::Transaction* trx, size_t, std::vector<size_t> const* mapping = nullptr);
 
   ~SingleServerEdgeCursor() {
     for (auto& it : _cursors) {
@@ -73,7 +75,7 @@ class SingleServerEdgeCursor : public EdgeCursor {
 class SingleServerTraverser final : public Traverser {
 
  public:
-  SingleServerTraverser(TraverserOptions*, Transaction*);
+  SingleServerTraverser(TraverserOptions*, Transaction*, ManagedDocumentResult*);
 
   ~SingleServerTraverser();
 

@@ -93,9 +93,10 @@ static bool IsEqualElementElement(void* userData, SimpleIndexElement const& left
   
 PrimaryIndexIterator::PrimaryIndexIterator(LogicalCollection* collection,
                        arangodb::Transaction* trx, 
+                       ManagedDocumentResult* mmdr,
                        PrimaryIndex const* index,
                        std::unique_ptr<VPackBuilder>& keys)
-    : IndexIterator(collection, trx, index),
+    : IndexIterator(collection, trx, mmdr, index),
       _index(index), 
       _keys(keys.get()), 
       _iterator(_keys->slice()) {
@@ -131,10 +132,11 @@ void PrimaryIndexIterator::reset() { _iterator.reset(); }
   
 AllIndexIterator::AllIndexIterator(LogicalCollection* collection,
                    arangodb::Transaction* trx, 
+                   ManagedDocumentResult* mmdr,
                    PrimaryIndex const* index,
                    PrimaryIndexImpl const* indexImpl,
                    bool reverse)
-    : IndexIterator(collection, trx, index), _index(indexImpl), _reverse(reverse), _total(0) {}
+    : IndexIterator(collection, trx, mmdr, index), _index(indexImpl), _reverse(reverse), _total(0) {}
 
 IndexLookupResult AllIndexIterator::next() {
   SimpleIndexElement element;
@@ -172,9 +174,10 @@ void AllIndexIterator::nextBabies(std::vector<IndexLookupResult>& buffer, size_t
 void AllIndexIterator::reset() { _position.reset(); }
   
 AnyIndexIterator::AnyIndexIterator(LogicalCollection* collection, arangodb::Transaction* trx, 
+                                   ManagedDocumentResult* mmdr,
                                    PrimaryIndex const* index,
                                    PrimaryIndexImpl const* indexImpl)
-    : IndexIterator(collection, trx, index), _index(indexImpl), _step(0), _total(0) {}
+    : IndexIterator(collection, trx, mmdr, index), _index(indexImpl), _step(0), _total(0) {}
 
 IndexLookupResult AnyIndexIterator::next() {
   SimpleIndexElement element = _index->findRandom(&_context, _initial, _position, _step, _total);
@@ -266,22 +269,19 @@ int PrimaryIndex::unload() {
 }
 
 /// @brief looks up an element given a key
-SimpleIndexElement PrimaryIndex::lookup(arangodb::Transaction* trx,
-                                        VPackSlice const& slice) const {
-  ManagedDocumentResult result(trx); 
-  IndexLookupContext context(trx, _collection, &result, 1); 
-  TRI_ASSERT(slice.isArray() && slice.length() == 1);
-  VPackSlice tmp = slice.at(0);
-  TRI_ASSERT(tmp.isObject() && tmp.hasKey(StaticStrings::IndexEq));
-  tmp = tmp.get(StaticStrings::IndexEq);
-  return _primaryIndex->findByKey(&context, tmp.begin());
+SimpleIndexElement PrimaryIndex::lookupKey(arangodb::Transaction* trx,
+                                           VPackSlice const& key) const {
+  ManagedDocumentResult mmdr(trx); 
+  IndexLookupContext context(trx, _collection, &mmdr, 1); 
+  TRI_ASSERT(key.isString());
+  return _primaryIndex->findByKey(&context, key.begin());
 }
 
 /// @brief looks up an element given a key
 SimpleIndexElement PrimaryIndex::lookupKey(arangodb::Transaction* trx,
-                                           VPackSlice const& key) const {
-  ManagedDocumentResult result(trx); 
-  IndexLookupContext context(trx, _collection, &result, 1); 
+                                           VPackSlice const& key,
+                                           ManagedDocumentResult& mmdr) const {
+  IndexLookupContext context(trx, _collection, &mmdr, 1); 
   TRI_ASSERT(key.isString());
   return _primaryIndex->findByKey(&context, key.begin());
 }
@@ -291,6 +291,19 @@ SimpleIndexElement* PrimaryIndex::lookupKeyRef(arangodb::Transaction* trx,
                                                VPackSlice const& key) const {
   ManagedDocumentResult result(trx); 
   IndexLookupContext context(trx, _collection, &result, 1); 
+  TRI_ASSERT(key.isString());
+  SimpleIndexElement* element = _primaryIndex->findByKeyRef(&context, key.begin());
+  if (element != nullptr && element->revisionId() == 0) {
+    return nullptr;
+  }
+  return element;
+}
+
+/// @brief looks up an element given a key
+SimpleIndexElement* PrimaryIndex::lookupKeyRef(arangodb::Transaction* trx,
+                                               VPackSlice const& key,
+                                               ManagedDocumentResult& mmdr) const {
+  IndexLookupContext context(trx, _collection, &mmdr, 1); 
   TRI_ASSERT(key.isString());
   SimpleIndexElement* element = _primaryIndex->findByKeyRef(&context, key.begin());
   if (element != nullptr && element->revisionId() == 0) {
@@ -321,8 +334,9 @@ SimpleIndexElement PrimaryIndex::lookupSequential(
 //////////////////////////////////////////////////////////////////////////////
 
 IndexIterator* PrimaryIndex::allIterator(arangodb::Transaction* trx,
+                                         ManagedDocumentResult* mmdr,
                                          bool reverse) const {
-  return new AllIndexIterator(_collection, trx, this, _primaryIndex, reverse);
+  return new AllIndexIterator(_collection, trx, mmdr, this, _primaryIndex, reverse);
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -331,8 +345,9 @@ IndexIterator* PrimaryIndex::allIterator(arangodb::Transaction* trx,
 ///        exactly once unless the collection is modified.
 //////////////////////////////////////////////////////////////////////////////
 
-IndexIterator* PrimaryIndex::anyIterator(arangodb::Transaction* trx) const {
-  return new AnyIndexIterator(_collection, trx, this, _primaryIndex);
+IndexIterator* PrimaryIndex::anyIterator(arangodb::Transaction* trx,
+                                         ManagedDocumentResult* mmdr) const {
+  return new AnyIndexIterator(_collection, trx, mmdr, this, _primaryIndex);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -422,6 +437,7 @@ bool PrimaryIndex::supportsFilterCondition(
 
 IndexIterator* PrimaryIndex::iteratorForCondition(
     arangodb::Transaction* trx, 
+    ManagedDocumentResult* mmdr,
     arangodb::aql::AstNode const* node,
     arangodb::aql::Variable const* reference, bool reverse) const {
   TRI_ASSERT(node->type == aql::NODE_TYPE_OPERATOR_NARY_AND);
@@ -443,14 +459,14 @@ IndexIterator* PrimaryIndex::iteratorForCondition(
 
   if (comp->type == aql::NODE_TYPE_OPERATOR_BINARY_EQ) {
     // a.b == value
-    return createEqIterator(trx, attrNode, valNode);
+    return createEqIterator(trx, mmdr, attrNode, valNode);
   } else if (comp->type == aql::NODE_TYPE_OPERATOR_BINARY_IN) {
     // a.b IN values
     if (!valNode->isArray()) {
       return nullptr;
     }
 
-    return createInIterator(trx, attrNode, valNode);
+    return createInIterator(trx, mmdr, attrNode, valNode);
   }
 
   // operator type unsupported
@@ -463,6 +479,7 @@ IndexIterator* PrimaryIndex::iteratorForCondition(
 
 IndexIterator* PrimaryIndex::iteratorForSlice(
     arangodb::Transaction* trx, 
+    ManagedDocumentResult* mmdr,
     arangodb::velocypack::Slice const searchValues, bool) const {
   if (!searchValues.isArray()) {
     // Invalid searchValue
@@ -472,7 +489,7 @@ IndexIterator* PrimaryIndex::iteratorForSlice(
   TransactionBuilderLeaser builder(trx);
   std::unique_ptr<VPackBuilder> keys(builder.steal());
   builder->add(searchValues);
-  return new PrimaryIndexIterator(_collection, trx, this, keys);
+  return new PrimaryIndexIterator(_collection, trx, mmdr, this, keys);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -493,6 +510,7 @@ arangodb::aql::AstNode* PrimaryIndex::specializeCondition(
 
 IndexIterator* PrimaryIndex::createInIterator(
     arangodb::Transaction* trx, 
+    ManagedDocumentResult* mmdr,
     arangodb::aql::AstNode const* attrNode,
     arangodb::aql::AstNode const* valNode) const {
   // _key or _id?
@@ -519,7 +537,7 @@ IndexIterator* PrimaryIndex::createInIterator(
     THROW_ARANGO_EXCEPTION(TRI_ERROR_DEBUG);
   }
   keys->close();
-  return new PrimaryIndexIterator(_collection, trx, this, keys);
+  return new PrimaryIndexIterator(_collection, trx, mmdr, this, keys);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -528,6 +546,7 @@ IndexIterator* PrimaryIndex::createInIterator(
 
 IndexIterator* PrimaryIndex::createEqIterator(
     arangodb::Transaction* trx, 
+    ManagedDocumentResult* mmdr,
     arangodb::aql::AstNode const* attrNode,
     arangodb::aql::AstNode const* valNode) const {
   // _key or _id?
@@ -545,7 +564,7 @@ IndexIterator* PrimaryIndex::createEqIterator(
     THROW_ARANGO_EXCEPTION(TRI_ERROR_DEBUG);
   }
   keys->close();
-  return new PrimaryIndexIterator(_collection, trx, this, keys);
+  return new PrimaryIndexIterator(_collection, trx, mmdr, this, keys);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

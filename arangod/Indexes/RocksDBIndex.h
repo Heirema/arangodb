@@ -63,6 +63,7 @@ class RocksDBIterator final : public IndexIterator {
 
  public:
   RocksDBIterator(LogicalCollection* collection, Transaction* trx, 
+                  ManagedDocumentResult* mmdr,
                   arangodb::RocksDBIndex const* index,
                   arangodb::PrimaryIndex* primaryIndex,
                   rocksdb::OptimisticTransactionDB* db,
@@ -173,8 +174,10 @@ class RocksDBIndex final : public PathBasedIndex {
   /// the velocypack::Slice and the RocksDBIterator* results
   //////////////////////////////////////////////////////////////////////////////
 
-  RocksDBIterator* lookup(arangodb::Transaction*, arangodb::velocypack::Slice const,
-                          bool) const;
+  RocksDBIterator* lookup(arangodb::Transaction*, 
+                          ManagedDocumentResult* mmdr,
+                          arangodb::velocypack::Slice const,
+                          bool reverse) const;
 
   bool supportsFilterCondition(arangodb::aql::AstNode const*,
                                arangodb::aql::Variable const*, size_t, size_t&,
@@ -185,6 +188,7 @@ class RocksDBIndex final : public PathBasedIndex {
                              double&, size_t&) const override;
 
   IndexIterator* iteratorForCondition(arangodb::Transaction*,
+                                      ManagedDocumentResult*,
                                       arangodb::aql::AstNode const*,
                                       arangodb::aql::Variable const*,
                                       bool) const override;

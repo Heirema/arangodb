@@ -37,7 +37,7 @@ ClusterTraverser::ClusterTraverser(
     arangodb::traverser::TraverserOptions* opts,
     std::unordered_map<ServerID, traverser::TraverserEngineID> const* engines,
     std::string const& dbname, Transaction* trx)
-    : Traverser(opts, trx), _dbname(dbname), _engines(engines) {
+    : Traverser(opts, trx, nullptr), _dbname(dbname), _engines(engines) {
   _opts->linkTraverser(this);
 }
 

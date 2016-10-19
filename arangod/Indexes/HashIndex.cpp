@@ -294,10 +294,11 @@ static bool IsEqualKeyElementUnique(void* userData, VPackSlice const* left,
 
 HashIndexIterator::HashIndexIterator(LogicalCollection* collection,
                                      arangodb::Transaction* trx,
+                                     ManagedDocumentResult* mmdr,
                                      HashIndex const* index,
                                      arangodb::aql::AstNode const* node,
                                      arangodb::aql::Variable const* reference)
-    : IndexIterator(collection, trx, index),
+    : IndexIterator(collection, trx, mmdr, index),
       _index(index),
       _lookups(trx, node, reference, index->fields()),
       _buffer(),
@@ -375,9 +376,10 @@ void HashIndexIterator::reset() {
   
 HashIndexIteratorVPack::HashIndexIteratorVPack(LogicalCollection* collection,
                                                arangodb::Transaction* trx, 
+                                               ManagedDocumentResult* mmdr,
                                                HashIndex const* index,
                                                std::unique_ptr<arangodb::velocypack::Builder>& searchValues)
-    : IndexIterator(collection, trx, index),
+    : IndexIterator(collection, trx, mmdr, index),
       _index(index),
       _searchValues(searchValues.get()),
       _iterator(_searchValues->slice()),
@@ -1035,12 +1037,13 @@ bool HashIndex::supportsFilterCondition(
 
 IndexIterator* HashIndex::iteratorForCondition(
     arangodb::Transaction* trx,
+    ManagedDocumentResult* mmdr,
     arangodb::aql::AstNode const* node,
     arangodb::aql::Variable const* reference, bool) const {
   TRI_IF_FAILURE("HashIndex::noIterator")  {
     THROW_ARANGO_EXCEPTION(TRI_ERROR_DEBUG);
   }
-  return new HashIndexIterator(_collection, trx, this, node, reference);
+  return new HashIndexIterator(_collection, trx, mmdr, this, node, reference);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1048,6 +1051,7 @@ IndexIterator* HashIndex::iteratorForCondition(
 ////////////////////////////////////////////////////////////////////////////////
 
 IndexIterator* HashIndex::iteratorForSlice(arangodb::Transaction* trx,
+                                           ManagedDocumentResult* mmdr,
                                            VPackSlice const searchValues,
                                            bool) const {
   if (!searchValues.isArray()) {
@@ -1058,7 +1062,7 @@ IndexIterator* HashIndex::iteratorForSlice(arangodb::Transaction* trx,
   TransactionBuilderLeaser builder(trx);
   std::unique_ptr<VPackBuilder> keys(builder.steal());
   keys->add(searchValues);
-  return new HashIndexIteratorVPack(_collection, trx, this, keys);
+  return new HashIndexIteratorVPack(_collection, trx, mmdr, this, keys);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

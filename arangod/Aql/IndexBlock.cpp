@@ -653,6 +653,7 @@ arangodb::OperationCursor* IndexBlock::orderCursor(size_t currentIndex) {
       _indexes[currentIndex], 
       conditionNode,
       node->outVariable(), 
+      nullptr,
       UINT64_MAX, 
       Transaction::defaultBatchSize(),
       node->_reverse

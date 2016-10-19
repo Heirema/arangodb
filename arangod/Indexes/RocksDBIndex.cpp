@@ -82,13 +82,14 @@ static size_t sortWeight(arangodb::aql::AstNode const* node) {
   
 RocksDBIterator::RocksDBIterator(LogicalCollection* collection,
                                  arangodb::Transaction* trx, 
+                                 ManagedDocumentResult* mmdr,
                                  arangodb::RocksDBIndex const* index,
                                  arangodb::PrimaryIndex* primaryIndex,
                                  rocksdb::OptimisticTransactionDB* db,
                                  bool reverse, 
                                  VPackSlice const& left,
                                  VPackSlice const& right)
-    : IndexIterator(collection, trx, index),
+    : IndexIterator(collection, trx, mmdr, index),
       _primaryIndex(primaryIndex),
       _db(db),
       _reverse(reverse),
@@ -492,6 +493,7 @@ int RocksDBIndex::drop() {
 /// Warning: who ever calls this function is responsible for destroying
 /// the RocksDBIterator* results
 RocksDBIterator* RocksDBIndex::lookup(arangodb::Transaction* trx,
+                                      ManagedDocumentResult* mmdr,
                                       VPackSlice const searchValues,
                                       bool reverse) const {
   TRI_ASSERT(searchValues.isArray());
@@ -588,7 +590,7 @@ RocksDBIterator* RocksDBIndex::lookup(arangodb::Transaction* trx,
   // _collection at least as long as trx is running.
   // Same for the iterator
   auto idx = _collection->primaryIndex();
-  return new RocksDBIterator(_collection, trx, this, idx, _db, reverse, leftBorder, rightBorder);
+  return new RocksDBIterator(_collection, trx, mmdr, this, idx, _db, reverse, leftBorder, rightBorder);
 }
 
 bool RocksDBIndex::accessFitsIndex(
@@ -879,6 +881,7 @@ bool RocksDBIndex::supportsSortCondition(
 
 IndexIterator* RocksDBIndex::iteratorForCondition(
     arangodb::Transaction* trx, 
+    ManagedDocumentResult* mmdr,
     arangodb::aql::AstNode const* node,
     arangodb::aql::Variable const* reference, bool reverse) const {
   VPackBuilder searchValues;
@@ -1039,7 +1042,7 @@ IndexIterator* RocksDBIndex::iteratorForCondition(
     std::vector<IndexIterator*> iterators;
     try {
       for (auto const& val : VPackArrayIterator(expandedSlice)) {
-        auto iterator = lookup(trx, val, reverse);
+        auto iterator = lookup(trx, mmdr, val, reverse);
         try {
           iterators.push_back(iterator);
         } catch (...) {
@@ -1058,13 +1061,13 @@ IndexIterator* RocksDBIndex::iteratorForCondition(
       }
       throw; 
     }
-    return new MultiIndexIterator(_collection, trx, this, iterators);
+    return new MultiIndexIterator(_collection, trx, mmdr, this, iterators);
   }
 
   VPackSlice searchSlice = searchValues.slice();
   TRI_ASSERT(searchSlice.length() == 1);
   searchSlice = searchSlice.at(0);
-  return lookup(trx, searchSlice, reverse);
+  return lookup(trx, mmdr, searchSlice, reverse);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

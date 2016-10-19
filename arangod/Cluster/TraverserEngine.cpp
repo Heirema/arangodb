@@ -154,7 +154,7 @@ void BaseTraverserEngine::getEdges(VPackSlice vertex, size_t depth, VPackBuilder
     for (VPackSlice v : VPackArrayIterator(vertex)) {
       TRI_ASSERT(v.isString());
       result.clear();
-      auto edgeCursor = _opts->nextCursor(v, depth);
+      auto edgeCursor = _opts->nextCursor(nullptr, v, depth);
       while(edgeCursor->next(result, cursorId)) {
         if (!_opts->evaluateEdgeExpression(result.back(), v, depth, cursorId)) {
           filtered++;
@@ -167,7 +167,7 @@ void BaseTraverserEngine::getEdges(VPackSlice vertex, size_t depth, VPackBuilder
       // Result now contains all valid edges, probably multiples.
     }
   } else if (vertex.isString()) {
-    std::unique_ptr<arangodb::traverser::EdgeCursor> edgeCursor(_opts->nextCursor(vertex, depth));
+    std::unique_ptr<arangodb::traverser::EdgeCursor> edgeCursor(_opts->nextCursor(nullptr, vertex, depth));
 
     while(edgeCursor->next(result, cursorId)) {
       if (!_opts->evaluateEdgeExpression(result.back(), vertex, depth, cursorId)) {
@@ -209,7 +209,7 @@ void BaseTraverserEngine::getVertexData(VPackSlice vertex, VPackBuilder& builder
     }
     builder.add(v);
     for (std::string const& shard : shards->second) {
-      int res = _trx->documentFastPath(shard, v, builder, false);
+      int res = _trx->documentFastPath(shard, nullptr, v, builder, false);
       if (res == TRI_ERROR_NO_ERROR) {
         found = true;
         // FOUND short circuit.
@@ -260,7 +260,7 @@ void BaseTraverserEngine::getVertexData(VPackSlice vertex, size_t depth,
     }
     builder.add(v);
     for (std::string const& shard : shards->second) {
-      int res = _trx->documentFastPath(shard, v, builder, false);
+      int res = _trx->documentFastPath(shard, nullptr, v, builder, false);
       if (res == TRI_ERROR_NO_ERROR) {
         read++;
         found = true;

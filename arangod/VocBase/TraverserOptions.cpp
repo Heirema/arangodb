@@ -580,7 +580,8 @@ bool arangodb::traverser::TraverserOptions::evaluateVertexExpression(
 }
 
 arangodb::traverser::EdgeCursor*
-arangodb::traverser::TraverserOptions::nextCursor(VPackSlice vertex,
+arangodb::traverser::TraverserOptions::nextCursor(ManagedDocumentResult* mmdr,
+                                                  VPackSlice vertex,
                                                   size_t depth) const {
   if (arangodb::ServerState::instance()->isCoordinator()) {
     return nextCursorCoordinator(vertex, depth);
@@ -592,13 +593,13 @@ arangodb::traverser::TraverserOptions::nextCursor(VPackSlice vertex,
   } else {
     list = _baseLookupInfos;
   }
-  return nextCursorLocal(vertex, depth, list);
+  return nextCursorLocal(mmdr, vertex, depth, list);
 }
 
 arangodb::traverser::EdgeCursor*
-arangodb::traverser::TraverserOptions::nextCursorLocal(
+arangodb::traverser::TraverserOptions::nextCursorLocal(ManagedDocumentResult* mmdr,
     VPackSlice vertex, size_t depth, std::vector<LookupInfo>& list) const {
-  auto allCursor = std::make_unique<SingleServerEdgeCursor>(_trx, list.size());
+  auto allCursor = std::make_unique<SingleServerEdgeCursor>(mmdr, _trx, list.size());
   auto& opCursors = allCursor->getCursors();
   VPackValueLength vidLength;
   char const* vid = vertex.getString(vidLength);
@@ -620,7 +621,7 @@ arangodb::traverser::TraverserOptions::nextCursorLocal(
     csrs.reserve(info.idxHandles.size());
     for (auto const& it : info.idxHandles) {
       csrs.emplace_back(_trx->indexScanForCondition(
-          it, node, _tmpVar, UINT64_MAX, 1000, false));
+          it, node, _tmpVar, mmdr, UINT64_MAX, 1000, false));
     }
     opCursors.emplace_back(std::move(csrs));
   }

@@ -44,6 +44,7 @@ typedef arangodb::basics::AssocMulti<arangodb::velocypack::Slice, SimpleIndexEle
 class EdgeIndexIterator final : public IndexIterator {
  public:
   EdgeIndexIterator(LogicalCollection* collection, arangodb::Transaction* trx,
+                    ManagedDocumentResult* mmdr,
                     arangodb::EdgeIndex const* index,
                     TRI_EdgeIndexHash_t const* indexImpl,
                     std::unique_ptr<VPackBuilder>& keys);
@@ -72,6 +73,7 @@ class AnyDirectionEdgeIndexIterator final : public IndexIterator {
  public:
   AnyDirectionEdgeIndexIterator(LogicalCollection* collection,
                                 arangodb::Transaction* trx,
+                                ManagedDocumentResult* mmdr,
                                 arangodb::EdgeIndex const* index,
                                 EdgeIndexIterator* outboundIterator,
                                 EdgeIndexIterator* inboundIterator);
@@ -162,6 +164,7 @@ class EdgeIndex final : public Index {
                                double&) const override;
 
   IndexIterator* iteratorForCondition(arangodb::Transaction*,
+                                      ManagedDocumentResult*,
                                       arangodb::aql::AstNode const*,
                                       arangodb::aql::Variable const*,
                                       bool) const override;
@@ -195,6 +198,7 @@ class EdgeIndex final : public Index {
   ////////////////////////////////////////////////////////////////////////////////
 
   IndexIterator* iteratorForSlice(arangodb::Transaction*, 
+                                  ManagedDocumentResult*,
                                   arangodb::velocypack::Slice const,
                                   bool) const override;
 
@@ -202,11 +206,13 @@ class EdgeIndex final : public Index {
   /// @brief create the iterator
   IndexIterator* createEqIterator(
       arangodb::Transaction*, 
+      ManagedDocumentResult*,
       arangodb::aql::AstNode const*,
       arangodb::aql::AstNode const*) const;
   
   IndexIterator* createInIterator(
       arangodb::Transaction*, 
+      ManagedDocumentResult*,
       arangodb::aql::AstNode const*,
       arangodb::aql::AstNode const*) const;
 

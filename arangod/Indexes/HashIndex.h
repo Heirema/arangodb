@@ -89,6 +89,7 @@ class HashIndexIterator final : public IndexIterator {
 ////////////////////////////////////////////////////////////////////////////////
 
   HashIndexIterator(LogicalCollection* collection, arangodb::Transaction* trx, 
+                    ManagedDocumentResult* mmdr,
                     HashIndex const* index,
                     arangodb::aql::AstNode const*,
                     arangodb::aql::Variable const*);
@@ -118,7 +119,9 @@ class HashIndexIteratorVPack final : public IndexIterator {
 ////////////////////////////////////////////////////////////////////////////////
 
   HashIndexIteratorVPack(LogicalCollection* collection,
-      arangodb::Transaction* trx, HashIndex const* index,
+      arangodb::Transaction* trx, 
+      ManagedDocumentResult* mmdr,
+      HashIndex const* index,
       std::unique_ptr<arangodb::velocypack::Builder>& searchValues);
 
   ~HashIndexIteratorVPack();
@@ -188,6 +191,7 @@ class HashIndex final : public PathBasedIndex {
                                double&) const override;
 
   IndexIterator* iteratorForCondition(arangodb::Transaction*,
+                                      ManagedDocumentResult*,
                                       arangodb::aql::AstNode const*,
                                       arangodb::aql::Variable const*,
                                       bool) const override;
@@ -201,6 +205,7 @@ class HashIndex final : public PathBasedIndex {
 ////////////////////////////////////////////////////////////////////////////////
 
   IndexIterator* iteratorForSlice(arangodb::Transaction*, 
+                                  ManagedDocumentResult*,
                                   arangodb::velocypack::Slice const,
                                   bool) const override;
 

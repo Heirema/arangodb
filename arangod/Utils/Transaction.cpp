@@ -1272,14 +1272,15 @@ OperationResult Transaction::anyLocal(std::string const& collectionName,
   
   VPackBuilder resultBuilder;
   resultBuilder.openArray();
+  
+  ManagedDocumentResult mmdr(this);
 
   std::unique_ptr<OperationCursor> cursor =
       indexScan(collectionName, Transaction::CursorType::ANY, IndexHandle(), 
-                {}, skip, limit, 1000, false);
+                {}, &mmdr, skip, limit, 1000, false);
 
   LogicalCollection* collection = cursor->collection();
   std::vector<IndexLookupResult> result;
-  ManagedDocumentResult mmdr(this);
   
   while (cursor->hasMore()) {
     result.clear();
@@ -1430,6 +1431,7 @@ void Transaction::invokeOnAllElements(std::string const& collectionName,
 //////////////////////////////////////////////////////////////////////////////
 
 int Transaction::documentFastPath(std::string const& collectionName,
+                                  ManagedDocumentResult* mmdr,
                                   VPackSlice const value,
                                   VPackBuilder& result,
                                   bool shouldLock) {
@@ -1461,8 +1463,13 @@ int Transaction::documentFastPath(std::string const& collectionName,
     return TRI_ERROR_ARANGO_DOCUMENT_HANDLE_BAD;
   }
 
-  ManagedDocumentResult doc(this);
-  int res = collection->read(this, key, doc,
+  std::unique_ptr<ManagedDocumentResult> tmp;
+  if (mmdr == nullptr) {
+    tmp.reset(new ManagedDocumentResult(this));
+    mmdr = tmp.get();
+  } 
+
+  int res = collection->read(this, key, *mmdr,
       shouldLock && !isLocked(collection, TRI_TRANSACTION_READ));
 
   if (res != TRI_ERROR_NO_ERROR) {
@@ -1471,7 +1478,7 @@ int Transaction::documentFastPath(std::string const& collectionName,
   
   TRI_ASSERT(hasDitch(cid));
 
-  uint8_t const* vpack = doc.vpack();
+  uint8_t const* vpack = mmdr->vpack();
   TRI_ASSERT(vpack != nullptr);
   result.addExternal(vpack);
   return TRI_ERROR_NO_ERROR;
@@ -2608,10 +2615,12 @@ OperationResult Transaction::allLocal(std::string const& collectionName,
   
   VPackBuilder resultBuilder;
   resultBuilder.openArray();
+  
+  ManagedDocumentResult mmdr(this);
 
   std::unique_ptr<OperationCursor> cursor =
       indexScan(collectionName, Transaction::CursorType::ALL, IndexHandle(),
-                {}, skip, limit, 1000, false);
+                {}, &mmdr, skip, limit, 1000, false);
 
   if (cursor->failed()) {
     return OperationResult(cursor->code);
@@ -2620,7 +2629,6 @@ OperationResult Transaction::allLocal(std::string const& collectionName,
   LogicalCollection* collection = cursor->collection();
   std::vector<IndexLookupResult> result;
   result.reserve(1000);
-  ManagedDocumentResult mmdr(this);
   
   while (cursor->hasMore()) {
     cursor->getMoreMptr(result, 1000);
@@ -3046,6 +3054,7 @@ std::pair<bool, bool> Transaction::getIndexForSortCondition(
 OperationCursor* Transaction::indexScanForCondition(
     IndexHandle const& indexId,
     arangodb::aql::AstNode const* condition, arangodb::aql::Variable const* var,
+    ManagedDocumentResult* mmdr,
     uint64_t limit, uint64_t batchSize, bool reverse) {
   if (ServerState::isCoordinator(_serverRole)) {
     // The index scan is only available on DBServers and Single Server.
@@ -3064,7 +3073,7 @@ OperationCursor* Transaction::indexScanForCondition(
   }
 
   // Now create the Iterator
-  std::unique_ptr<IndexIterator> iterator(idx->iteratorForCondition(this, condition, var, reverse));
+  std::unique_ptr<IndexIterator> iterator(idx->iteratorForCondition(this, mmdr, condition, var, reverse));
 
   if (iterator == nullptr) {
     // We could not create an ITERATOR and it did not throw an error itself
@@ -3082,8 +3091,9 @@ OperationCursor* Transaction::indexScanForCondition(
 
 std::unique_ptr<OperationCursor> Transaction::indexScan(
     std::string const& collectionName, CursorType cursorType,
-    IndexHandle const& indexId, VPackSlice const search, uint64_t skip,
-    uint64_t limit, uint64_t batchSize, bool reverse) {
+    IndexHandle const& indexId, VPackSlice const search, 
+    ManagedDocumentResult* mmdr,
+    uint64_t skip, uint64_t limit, uint64_t batchSize, bool reverse) {
   // For now we assume indexId is the iid part of the index.
 
   if (ServerState::isCoordinator(_serverRole)) {
@@ -3118,7 +3128,7 @@ std::unique_ptr<OperationCursor> Transaction::indexScan(
             "Could not find primary index in collection '" + collectionName + "'.");
       }
 
-      iterator.reset(idx->anyIterator(this));
+      iterator.reset(idx->anyIterator(this, mmdr));
       break;
     }
     case CursorType::ALL: {
@@ -3135,7 +3145,7 @@ std::unique_ptr<OperationCursor> Transaction::indexScan(
             "Could not find primary index in collection '" + collectionName + "'.");
       }
 
-      iterator.reset(idx->allIterator(this, reverse));
+      iterator.reset(idx->allIterator(this, mmdr, reverse));
       break;
     }
     case CursorType::INDEX: {
@@ -3149,7 +3159,7 @@ std::unique_ptr<OperationCursor> Transaction::indexScan(
       // idx->expandInSearchValues(search, expander);
 
       // Now collect the Iterator
-      iterator.reset(idx->iteratorForSlice(this, search, reverse));
+      iterator.reset(idx->iteratorForSlice(this, mmdr, search, reverse));
     }
   }
   if (iterator == nullptr) {

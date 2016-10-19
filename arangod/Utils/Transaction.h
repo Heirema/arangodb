@@ -465,6 +465,7 @@ class Transaction {
   //////////////////////////////////////////////////////////////////////////////
 
   int documentFastPath(std::string const& collectionName,
+                       ManagedDocumentResult* mmdr,
                        arangodb::velocypack::Slice const value,
                        arangodb::velocypack::Builder& result,
                        bool shouldLock);
@@ -614,6 +615,7 @@ class Transaction {
   OperationCursor* indexScanForCondition(IndexHandle const&,
                                          arangodb::aql::AstNode const*,
                                          arangodb::aql::Variable const*,
+                                         ManagedDocumentResult*,
                                          uint64_t, uint64_t, bool);
 
   //////////////////////////////////////////////////////////////////////////////
@@ -626,6 +628,7 @@ class Transaction {
                                              CursorType cursorType,
                                              IndexHandle const& indexId,
                                              VPackSlice const search,
+                                             ManagedDocumentResult*,
                                              uint64_t skip, uint64_t limit,
                                              uint64_t batchSize, bool reverse);
 

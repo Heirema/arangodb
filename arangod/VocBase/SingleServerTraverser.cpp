@@ -55,9 +55,11 @@ static int FetchDocumentById(arangodb::Transaction* trx,
   return res;
 }
 
-SingleServerEdgeCursor::SingleServerEdgeCursor(Transaction* trx,
+SingleServerEdgeCursor::SingleServerEdgeCursor(ManagedDocumentResult* mmdr,
+    Transaction* trx,
     size_t nrCursors, std::vector<size_t> const* mapping)
-    : _trx(trx), 
+    : _trx(trx),
+      _mmdr(mmdr), 
       _cursors(),
       _currentCursor(0),
       _currentSubCursor(0),
@@ -75,10 +77,9 @@ bool SingleServerEdgeCursor::next(std::vector<VPackSlice>& result,
   _cachePos++;
   if (_cachePos < _cache.size()) {
     LogicalCollection* collection = _cursors[_currentCursor][_currentSubCursor]->collection();
-    ManagedDocumentResult mmdr(_trx);
     TRI_voc_rid_t revisionId = _cache[_cachePos].revisionId();
-    if (collection->readRevision(_trx, mmdr, revisionId)) {
-      result.emplace_back(mmdr.vpack());
+    if (collection->readRevision(_trx, *_mmdr, revisionId)) {
+      result.emplace_back(_mmdr->vpack());
     }
     if (_internalCursorMapping != nullptr) {
       TRI_ASSERT(_currentCursor < _internalCursorMapping->size());
@@ -124,12 +125,11 @@ bool SingleServerEdgeCursor::next(std::vector<VPackSlice>& result,
     }
   } while (_cache.empty());
 
-  ManagedDocumentResult mmdr(_trx);
   TRI_ASSERT(_cachePos < _cache.size());
   LogicalCollection* collection = cursor->collection();
   TRI_voc_rid_t revisionId = _cache[_cachePos].revisionId();
-  if (collection->readRevision(_trx, mmdr, revisionId)) {
-    result.emplace_back(mmdr.vpack());
+  if (collection->readRevision(_trx, *_mmdr, revisionId)) {
+    result.emplace_back(_mmdr->vpack());
   }
   if (_internalCursorMapping != nullptr) {
     TRI_ASSERT(_currentCursor < _internalCursorMapping->size());
@@ -146,8 +146,6 @@ bool SingleServerEdgeCursor::readAll(std::unordered_set<VPackSlice>& result,
     return false;
   }
   
-  ManagedDocumentResult mmdr(_trx); // TODO
-
   if (_internalCursorMapping != nullptr) {
     TRI_ASSERT(_currentCursor < _internalCursorMapping->size());
     cursorId = _internalCursorMapping->at(_currentCursor);
@@ -164,8 +162,8 @@ bool SingleServerEdgeCursor::readAll(std::unordered_set<VPackSlice>& result,
       cursor->getMoreMptr(_cache);
       for (auto const& element : _cache) {
         TRI_voc_rid_t revisionId = element.revisionId();
-        if (collection->readRevision(_trx, mmdr, revisionId)) {
-          result.emplace(mmdr.vpack());
+        if (collection->readRevision(_trx, *_mmdr, revisionId)) {
+          result.emplace(_mmdr->vpack());
         }
       }
     }
@@ -175,8 +173,9 @@ bool SingleServerEdgeCursor::readAll(std::unordered_set<VPackSlice>& result,
 }
 
 SingleServerTraverser::SingleServerTraverser(TraverserOptions* opts,
-                                             arangodb::Transaction* trx)
-    : Traverser(opts, trx) {}
+                                             arangodb::Transaction* trx,
+                                             ManagedDocumentResult* mmdr)
+    : Traverser(opts, trx, mmdr) {}
 
 SingleServerTraverser::~SingleServerTraverser() {}
 
@@ -185,15 +184,14 @@ aql::AqlValue SingleServerTraverser::fetchVertexData(VPackSlice id) {
   auto it = _vertices.find(id);
 
   if (it == _vertices.end()) {
-    ManagedDocumentResult doc(_trx);
     StringRef ref(id);
-    int res = FetchDocumentById(_trx, ref, doc);
+    int res = FetchDocumentById(_trx, ref, *_mmdr);
     ++_readDocuments;
     if (res != TRI_ERROR_NO_ERROR) {
       return aql::AqlValue(basics::VelocyPackHelper::NullValue());
     }
 
-    uint8_t const* p = doc.vpack();
+    uint8_t const* p = _mmdr->vpack();
     _vertices.emplace(id, p);
     return aql::AqlValue(p, aql::AqlValueFromManagedDocument());
   }
@@ -211,14 +209,13 @@ void SingleServerTraverser::addVertexToVelocyPack(VPackSlice id,
   auto it = _vertices.find(id);
 
   if (it == _vertices.end()) {
-    ManagedDocumentResult doc(_trx);
     StringRef ref(id);
-    int res = FetchDocumentById(_trx, ref, doc);
+    int res = FetchDocumentById(_trx, ref, *_mmdr);
     ++_readDocuments;
     if (res != TRI_ERROR_NO_ERROR) {
       result.add(basics::VelocyPackHelper::NullValue());
     } else {
-      uint8_t const* p = doc.vpack();
+      uint8_t const* p = _mmdr->vpack();
       _vertices.emplace(id, p);
       result.addExternal(p);
     }

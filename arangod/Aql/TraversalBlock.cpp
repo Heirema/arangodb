@@ -67,6 +67,7 @@ TraversalBlock::TraversalBlock(ExecutionEngine* engine, TraversalNode const* ep)
   }
 
   _opts = ep->options();
+  _mmdr.reset(new ManagedDocumentResult(_trx));
 
   if (arangodb::ServerState::instance()->isCoordinator()) {
 #ifdef USE_ENTERPRISE
@@ -89,7 +90,7 @@ TraversalBlock::TraversalBlock(ExecutionEngine* engine, TraversalNode const* ep)
 #endif
   } else {
     _traverser.reset(
-        new arangodb::traverser::SingleServerTraverser(_opts, _trx));
+        new arangodb::traverser::SingleServerTraverser(_opts, _trx, _mmdr.get()));
   }
   if (!ep->usesInVariable()) {
     _vertexId = ep->getStartVertex();
@@ -114,7 +115,6 @@ TraversalBlock::TraversalBlock(ExecutionEngine* engine, TraversalNode const* ep)
   if (arangodb::ServerState::instance()->isCoordinator()) {
     _engines = ep->engines();
   }
-
 }
 
 TraversalBlock::~TraversalBlock() {
