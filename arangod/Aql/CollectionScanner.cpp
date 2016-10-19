@@ -29,12 +29,13 @@
 using namespace arangodb::aql;
 
 CollectionScanner::CollectionScanner(arangodb::Transaction* trx,
+                                     ManagedDocumentResult* mmdr,
                                      std::string const& collection,
                                      bool readRandom)
     : _cursor(trx->indexScan(collection,
                              (readRandom ? Transaction::CursorType::ANY
                                          : Transaction::CursorType::ALL),
-                             Transaction::IndexHandle(), VPackSlice(), nullptr, 0, 
+                             Transaction::IndexHandle(), VPackSlice(), mmdr, 0, 
                              UINT64_MAX, 1000, false)) {
   TRI_ASSERT(_cursor->successful());
 }

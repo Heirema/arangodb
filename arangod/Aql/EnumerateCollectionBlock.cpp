@@ -36,9 +36,11 @@ EnumerateCollectionBlock::EnumerateCollectionBlock(
     ExecutionEngine* engine, EnumerateCollectionNode const* ep)
     : ExecutionBlock(engine, ep),
       _collection(ep->_collection),
-      _scanner(_trx, _collection->getName(), ep->_random),
+      _mmdr(new ManagedDocumentResult(transaction())),
+      _scanner(_trx, _mmdr.get(), _collection->getName(), ep->_random),
       _position(0),
-      _mustStoreResult(true) {}
+      _mustStoreResult(true) {
+}
 
 /// @brief initialize fetching of documents
 void EnumerateCollectionBlock::initializeDocuments() {
@@ -208,10 +210,6 @@ AqlItemBlock* EnumerateCollectionBlock::getSome(size_t,  // atLeast,
   auto col = _collection->getCollection();
   LogicalCollection* c = col.get();
 
-  if (_mmdr == nullptr) {
-    _mmdr.reset(new ManagedDocumentResult(_trx));
-  }
-
   for (size_t j = 0; j < toSend; j++) {
     if (_mustStoreResult) {
       // The result is in the first variable of this depth,
@@ -219,7 +217,7 @@ AqlItemBlock* EnumerateCollectionBlock::getSome(size_t,  // atLeast,
       // but can just take cur->getNrRegs() as registerId:
       TRI_voc_rid_t revisionId = _documents[_position].revisionId();
       if (c->readRevision(_trx, *_mmdr, revisionId)) {
-        uint8_t const* vpack = _mmdr->vpack(); //back();
+        uint8_t const* vpack = _mmdr->vpack(); 
         res->setValue(j, static_cast<arangodb::aql::RegisterId>(curRegs), AqlValue(vpack, AqlValueFromManagedDocument()));
       }
       // No harm done, if the setValue throws!

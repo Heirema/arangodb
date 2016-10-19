@@ -74,6 +74,8 @@ class EnumerateCollectionBlock : public ExecutionBlock {
  private:
   /// @brief collection
   Collection* _collection;
+  
+  std::unique_ptr<ManagedDocumentResult> _mmdr;
 
   /// @brief collection scanner
   CollectionScanner _scanner;
@@ -86,8 +88,6 @@ class EnumerateCollectionBlock : public ExecutionBlock {
 
   /// @brief whether or not the enumerated documents need to be stored
   bool _mustStoreResult;
-    
-  std::unique_ptr<ManagedDocumentResult> _mmdr;
 };
 
 }  // namespace arangodb::aql

@@ -28,6 +28,7 @@
 #include "Indexes/IndexElement.h"
 
 namespace arangodb {
+class ManagedDocumentResult;
 class OperationCursor;
 class Transaction;
 
@@ -35,7 +36,7 @@ namespace aql {
 
 class CollectionScanner {
  public:
-  CollectionScanner(arangodb::Transaction*, std::string const&, bool);
+  CollectionScanner(arangodb::Transaction*, ManagedDocumentResult*, std::string const&, bool);
 
   ~CollectionScanner();
 

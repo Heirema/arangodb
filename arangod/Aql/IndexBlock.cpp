@@ -50,7 +50,10 @@ IndexBlock::IndexBlock(ExecutionEngine* engine, IndexNode const* en)
       _cursor(nullptr),
       _cursors(_indexes.size()),
       _condition(en->_condition->root()),
-      _hasV8Expression(false) {}
+      _hasV8Expression(false) {
+    
+  _mmdr.reset(new ManagedDocumentResult(transaction()));
+}
 
 IndexBlock::~IndexBlock() {
   cleanupNonConstExpressions();
@@ -66,7 +69,7 @@ arangodb::aql::AstNode* IndexBlock::makeUnique(
     auto ast = en->_plan->getAst();
     auto array = ast->createNodeArray();
     array->addMember(node);
-    auto trx = ast->query()->trx();
+    auto trx = transaction();
     bool isSorted = false;
     bool isSparse = false;
     auto unused = trx->getIndexFeatures(_indexes[_currentIndex], isSorted, isSparse);
@@ -393,9 +396,6 @@ bool IndexBlock::readIndex(size_t atMost) {
       THROW_ARANGO_EXCEPTION(TRI_ERROR_DEBUG);
     }
      
-    if (_mmdr == nullptr) {
-      _mmdr.reset(new ManagedDocumentResult(_trx));
-    }
 
     if (hasMultipleIndexes) {
       for (auto const& element : _result) {
@@ -653,7 +653,7 @@ arangodb::OperationCursor* IndexBlock::orderCursor(size_t currentIndex) {
       _indexes[currentIndex], 
       conditionNode,
       node->outVariable(), 
-      nullptr,
+      _mmdr.get(),
       UINT64_MAX, 
       Transaction::defaultBatchSize(),
       node->_reverse
