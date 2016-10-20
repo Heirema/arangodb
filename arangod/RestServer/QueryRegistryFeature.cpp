@@ -46,6 +46,7 @@ QueryRegistryFeature::QueryRegistryFeature(ApplicationServer* server)
   startsAfter("DatabasePath");
   startsAfter("Database");
   startsAfter("LogfileManager");
+  startsAfter("Cluster");
 }
 
 void QueryRegistryFeature::collectOptions(
