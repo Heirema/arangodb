@@ -142,6 +142,7 @@ arangodb::traverser::TraverserOptions::TraverserOptions(
       _baseVertexExpression(nullptr),
       _tmpVar(nullptr),
       _ctx(new aql::FixedVarExpressionContext()),
+      _isCoordinator(arangodb::ServerState::instance()->isCoordinator()),
       minDepth(1),
       maxDepth(1),
       useBreadthFirst(false),
@@ -195,6 +196,7 @@ arangodb::traverser::TraverserOptions::TraverserOptions(
       _baseVertexExpression(nullptr),
       _tmpVar(nullptr),
       _ctx(new aql::FixedVarExpressionContext()),
+      _isCoordinator(arangodb::ServerState::instance()->isCoordinator()),
       minDepth(1),
       maxDepth(1),
       useBreadthFirst(false),
@@ -351,6 +353,7 @@ arangodb::traverser::TraverserOptions::TraverserOptions(
       _baseVertexExpression(nullptr),
       _tmpVar(nullptr),
       _ctx(new aql::FixedVarExpressionContext()),
+      _isCoordinator(arangodb::ServerState::instance()->isCoordinator()),
       minDepth(other.minDepth),
       maxDepth(other.maxDepth),
       useBreadthFirst(other.useBreadthFirst),
@@ -502,15 +505,13 @@ bool arangodb::traverser::TraverserOptions::vertexHasFilter(
 bool arangodb::traverser::TraverserOptions::evaluateEdgeExpression(
     arangodb::velocypack::Slice edge, arangodb::velocypack::Slice vertex,
     size_t depth, size_t cursorId) const {
-  if (arangodb::ServerState::instance()->isCoordinator()) {
+  if (_isCoordinator) {
     // The Coordinator never checks conditions. The DBServer is responsible!
     return true;
   }
-  auto specific = _depthLookupInfo.find(depth);
   arangodb::aql::Expression* expression = nullptr;
 
-  VPackValueLength vidLength;
-  char const* vid = vertex.getString(vidLength);
+  auto specific = _depthLookupInfo.find(depth);
 
   if (specific != _depthLookupInfo.end()) {
     TRI_ASSERT(!specific->second.empty());
@@ -524,6 +525,9 @@ bool arangodb::traverser::TraverserOptions::evaluateEdgeExpression(
   if (expression != nullptr) {
     TRI_ASSERT(!expression->isV8());
     expression->setVariable(_tmpVar, edge);
+  
+    VPackValueLength vidLength;
+    char const* vid = vertex.getString(vidLength);
 
     // inject _from/_to value
     auto node = expression->nodeForModification();
@@ -556,6 +560,7 @@ bool arangodb::traverser::TraverserOptions::evaluateVertexExpression(
   arangodb::aql::Expression* expression = nullptr;
 
   auto specific = _vertexExpressions.find(depth);
+
   if (specific != _vertexExpressions.end()) {
     expression = specific->second;
   } else {
@@ -583,7 +588,7 @@ arangodb::traverser::EdgeCursor*
 arangodb::traverser::TraverserOptions::nextCursor(ManagedDocumentResult* mmdr,
                                                   VPackSlice vertex,
                                                   size_t depth) const {
-  if (arangodb::ServerState::instance()->isCoordinator()) {
+  if (_isCoordinator) {
     return nextCursorCoordinator(vertex, depth);
   }
   TRI_ASSERT(mmdr != nullptr);

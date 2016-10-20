@@ -104,6 +104,7 @@ struct TraverserOptions {
   aql::Variable const* _tmpVar;
   aql::FixedVarExpressionContext* _ctx;
   arangodb::traverser::ClusterTraverser* _traverser;
+  bool const _isCoordinator;
 
  public:
   uint64_t minDepth;
@@ -122,6 +123,7 @@ struct TraverserOptions {
         _tmpVar(nullptr),
         _ctx(new aql::FixedVarExpressionContext()),
         _traverser(nullptr),
+        _isCoordinator(arangodb::ServerState::instance()->isCoordinator()),
         minDepth(1),
         maxDepth(1),
         useBreadthFirst(false),

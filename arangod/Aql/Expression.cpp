@@ -545,7 +545,7 @@ AqlValue Expression::executeSimpleExpressionAttributeAccess(
   TRI_ASSERT(node->numMembers() == 1);
 
   auto member = node->getMemberUnchecked(0);
-  auto name = static_cast<char const*>(node->getData());
+  char const* name = static_cast<char const*>(node->getData());
 
   AqlValue result = executeSimpleExpression(member, trx, mustDestroy, false);
   AqlValueGuard guard(result, mustDestroy);
@@ -1028,6 +1028,8 @@ AqlValue Expression::executeSimpleExpressionNaryAndOr(
     mustDestroy = true;
     return AqlValue(true);
   }
+
+  // AND
   if (node->type == NODE_TYPE_OPERATOR_NARY_AND) {
     for (size_t i = 0; i < count; ++i) {
       AqlValue check =
@@ -1045,11 +1047,12 @@ AqlValue Expression::executeSimpleExpressionNaryAndOr(
     return AqlValue(true);
   }
 
+  // OR
   for (size_t i = 0; i < count; ++i) {
     AqlValue check =
         executeSimpleExpression(node->getMember(i), trx, mustDestroy, true);
     if (check.toBoolean()) {
-      // Check is false. Return it.
+      // Check is true. Return it.
       return check;
     }
 

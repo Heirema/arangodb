@@ -69,7 +69,10 @@ void ReadCache::closeWriteChunk() {
 
 ChunkProtector ReadCache::readAndLease(RevisionCacheEntry const& entry, ManagedDocumentResult& result) {
   if (result.hasSeenChunk(entry.chunk()) && entry.offset() != UINT32_MAX) {
+    // TODO: don't return a Protector here but a simple value object
     ChunkProtector p(entry.chunk(), entry.offset(), entry.version(), false);
+    // handle take-over of resources from ChunkProtector inside ManagedDocumentResult::addExisting()
+    // remove ChunkProtector::~ChunkProtector
     result.addExisting(p, entry.revisionId);
     return p;
   }
@@ -78,9 +81,12 @@ ChunkProtector ReadCache::readAndLease(RevisionCacheEntry const& entry, ManagedD
   
   if (p) {
     // LOG(ERR) << (void*) &result << ", HAVE NOT SEEN CHUNK: " << entry.chunk() << ", OFFSET: " << entry.offset();
+    // handle take-over of resources from ChunkProtector inside ManagedDocumentResult::add()
+    // remove ChunkProtector::~ChunkProtector
     result.add(p, entry.revisionId);
   }
 
+  // TODO: don't return a Protector here but a simple value object
   return p;
 }
 
