@@ -247,8 +247,7 @@ class Traverser {
   class UniqueVertexGetter : public VertexGetter {
    public:
     explicit UniqueVertexGetter(Traverser* traverser)
-        : VertexGetter(traverser),
-          _returnedVertices(512, arangodb::basics::VelocyPackHelper::VPackStringHash(), arangodb::basics::VelocyPackHelper::VPackStringEqual()) {}
+        : VertexGetter(traverser) {}
 
     ~UniqueVertexGetter() = default;
 
@@ -262,7 +261,7 @@ class Traverser {
     void reset(arangodb::velocypack::Slice) override;
 
    private:
-    std::unordered_set<arangodb::velocypack::Slice, arangodb::basics::VelocyPackHelper::VPackStringHash, arangodb::basics::VelocyPackHelper::VPackStringEqual> _returnedVertices;
+    std::unordered_set<arangodb::velocypack::Slice> _returnedVertices;
   };
 
 

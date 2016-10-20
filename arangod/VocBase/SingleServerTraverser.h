@@ -25,7 +25,6 @@
 #define ARANGOD_SINGLE_SERVER_TRAVERSER_H 1
 
 #include "Aql/AqlValue.h"
-#include "Basics/VelocyPackHelper.h"
 #include "Indexes/IndexElement.h"
 #include "Utils/OperationCursor.h"
 #include "VocBase/Traverser.h"
@@ -134,7 +133,7 @@ class SingleServerTraverser final : public Traverser {
   /// document VPack value (in datafiles)
   //////////////////////////////////////////////////////////////////////////////
 
-  std::unordered_map<arangodb::velocypack::Slice, uint8_t const*, arangodb::basics::VelocyPackHelper::VPackStringHash, arangodb::basics::VelocyPackHelper::VPackStringEqual> _vertices;
+  std::unordered_map<arangodb::velocypack::Slice, uint8_t const*> _vertices;
 
   //////////////////////////////////////////////////////////////////////////////
   /// @brief Cache for edge documents, points from _id to start of edge

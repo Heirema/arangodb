@@ -252,7 +252,7 @@ bool Traverser::VertexGetter::getVertex(
     VPackSlice edge, std::vector<VPackSlice>& result) {
   VPackSlice cmp = result.back();
   VPackSlice res = Transaction::extractFromFromDocument(edge);
-  if (cmp.equals(res)) {
+  if (cmp == res) {
     res = Transaction::extractToFromDocument(edge);
   }
 
@@ -268,7 +268,7 @@ bool Traverser::VertexGetter::getSingleVertex(VPackSlice edge,
                                               size_t depth,
                                               VPackSlice& result) {
   VPackSlice from = Transaction::extractFromFromDocument(edge);
-  if (!from.equals(cmp)) {
+  if (from != cmp) {
     result = from;
   } else {
     result = Transaction::extractToFromDocument(edge);
@@ -284,7 +284,7 @@ bool Traverser::UniqueVertexGetter::getVertex(
   VPackSlice toAdd = Transaction::extractFromFromDocument(edge);
   VPackSlice cmp = result.back();
 
-  if (toAdd.equals(cmp)) {
+  if (toAdd == cmp) {
     toAdd = Transaction::extractToFromDocument(edge);
   }
 
@@ -309,7 +309,7 @@ bool Traverser::UniqueVertexGetter::getSingleVertex(
   VPackSlice edge, VPackSlice cmp, size_t depth, VPackSlice& result) {
   result = Transaction::extractFromFromDocument(edge);
 
-  if (cmp.equals(result)) {
+  if (cmp == result) {
     result = Transaction::extractToFromDocument(edge);
   }
   
