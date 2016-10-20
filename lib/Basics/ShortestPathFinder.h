@@ -806,7 +806,7 @@ class DynamicDistanceFinder : public PathFinder<VertexId, Path> {
   // Caller has to free the result
   // If this returns true there is a path, if this returns false there is no
   // path
-  bool shortestPath(VertexId& start, VertexId& target, Path& result) override{
+  bool shortestPath(VertexId& start, VertexId& target, Path& result) override {
     // For the result:
     result.clear();
     _highscoreSet = false;
