@@ -337,7 +337,7 @@ OperationID ClusterComm::getOperationID() { return TRI_NewTickServer(); }
 ////////////////////////////////////////////////////////////////////////////////
 
 OperationID ClusterComm::asyncRequest(
-    ClientTransactionID const clientTransactionID,
+    ClientTransactionID const& clientTransactionID,
     CoordTransactionID const coordTransactionID, std::string const& destination,
     arangodb::rest::RequestType reqtype, std::string const& path,
     std::shared_ptr<std::string const> body,
