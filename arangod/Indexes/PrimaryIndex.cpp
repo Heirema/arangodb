@@ -378,6 +378,13 @@ int PrimaryIndex::insertKey(arangodb::Transaction* trx, TRI_voc_rid_t revisionId
   return _primaryIndex->insert(&context, element);
 }
 
+int PrimaryIndex::insertKey(arangodb::Transaction* trx, TRI_voc_rid_t revisionId, VPackSlice const& doc, ManagedDocumentResult& mmdr) {
+  IndexLookupContext context(trx, _collection, &mmdr, 1); 
+  SimpleIndexElement element(buildKeyElement(revisionId, doc));
+  
+  return _primaryIndex->insert(&context, element);
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief removes an key/element from the index
 ////////////////////////////////////////////////////////////////////////////////
@@ -386,6 +393,20 @@ int PrimaryIndex::removeKey(arangodb::Transaction* trx,
                             TRI_voc_rid_t revisionId, VPackSlice const& doc) {
   ManagedDocumentResult result(trx); 
   IndexLookupContext context(trx, _collection, &result, 1); 
+  
+  VPackSlice keySlice(Transaction::extractKeyFromDocument(doc));
+  SimpleIndexElement found = _primaryIndex->removeByKey(&context, keySlice.begin());
+
+  if (!found) {
+    return TRI_ERROR_ARANGO_DOCUMENT_NOT_FOUND;
+  }
+    
+  return TRI_ERROR_NO_ERROR;
+}
+
+int PrimaryIndex::removeKey(arangodb::Transaction* trx,
+                            TRI_voc_rid_t revisionId, VPackSlice const& doc, ManagedDocumentResult& mmdr) {
+  IndexLookupContext context(trx, _collection, &mmdr, 1); 
   
   VPackSlice keySlice(Transaction::extractKeyFromDocument(doc));
   SimpleIndexElement found = _primaryIndex->removeByKey(&context, keySlice.begin());

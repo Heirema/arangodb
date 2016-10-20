@@ -195,8 +195,10 @@ class PrimaryIndex final : public Index {
       arangodb::Transaction*, arangodb::basics::BucketPosition& position);
 
   int insertKey(arangodb::Transaction*, TRI_voc_rid_t revisionId, arangodb::velocypack::Slice const&);
+  int insertKey(arangodb::Transaction*, TRI_voc_rid_t revisionId, arangodb::velocypack::Slice const&, ManagedDocumentResult&);
 
   int removeKey(arangodb::Transaction*, TRI_voc_rid_t revisionId, arangodb::velocypack::Slice const&);
+  int removeKey(arangodb::Transaction*, TRI_voc_rid_t revisionId, arangodb::velocypack::Slice const&, ManagedDocumentResult&);
 
   int resize(arangodb::Transaction*, size_t);
 

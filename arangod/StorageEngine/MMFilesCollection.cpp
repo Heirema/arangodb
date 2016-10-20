@@ -104,7 +104,7 @@ int MMFilesCollection::OpenIteratorHandleDocumentMarker(TRI_df_marker_t const* m
     c->insertRevision(revisionId, vpack, fid, false); 
 
     // insert into primary index
-    int res = primaryIndex->insertKey(trx, revisionId, VPackSlice(vpack));
+    int res = primaryIndex->insertKey(trx, revisionId, VPackSlice(vpack), state->_mmdr);
 
     if (res != TRI_ERROR_NO_ERROR) {
       c->removeRevision(revisionId, false);
@@ -223,7 +223,7 @@ int MMFilesCollection::OpenIteratorHandleDeletionMarker(TRI_df_marker_t const* m
     dfi->sizeDead += DatafileHelper::AlignedSize<int64_t>(size);
     state->_dfi->numberDeletions++;
 
-    primaryIndex->removeKey(trx, oldRevisionId, VPackSlice(vpack));
+    primaryIndex->removeKey(trx, oldRevisionId, VPackSlice(vpack), state->_mmdr);
 
     c->removeRevision(oldRevisionId, true);
   }
