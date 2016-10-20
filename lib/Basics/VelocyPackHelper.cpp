@@ -278,10 +278,10 @@ bool VelocyPackHelper::VPackStringEqual::operator()(VPackSlice const& lhs,
   if (lh == 0xbf) {
     // long UTF-8 String
     size = static_cast<VPackValueLength>(
-        velocypack::readInteger<VPackValueLength>(lhs.begin() + 1, 8));
+        velocypack::readIntegerFixed<VPackValueLength, 8>(lhs.begin() + 1));
     if (size !=
         static_cast<VPackValueLength>(
-            velocypack::readInteger<VPackValueLength>(rhs.begin() + 1, 8))) {
+            velocypack::readIntegerFixed<VPackValueLength, 8>(rhs.begin() + 1))) {
       return false;
     }
     return (memcmp(lhs.start() + 1 + 8, rhs.start() + 1 + 8,

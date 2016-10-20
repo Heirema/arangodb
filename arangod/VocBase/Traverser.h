@@ -27,6 +27,7 @@
 #include "Basics/Common.h"
 #include "Basics/hashes.h"
 #include "Basics/ShortestPathFinder.h"
+#include "Basics/VelocyPackHelper.h"
 #include "Aql/AqlValue.h"
 #include "Aql/AstNode.h"
 #include "VocBase/PathEnumerator.h"
@@ -246,7 +247,8 @@ class Traverser {
   class UniqueVertexGetter : public VertexGetter {
    public:
     explicit UniqueVertexGetter(Traverser* traverser)
-        : VertexGetter(traverser) {}
+        : VertexGetter(traverser),
+          _returnedVertices(512, arangodb::basics::VelocyPackHelper::VPackStringHash(), arangodb::basics::VelocyPackHelper::VPackStringEqual()) {}
 
     ~UniqueVertexGetter() = default;
 
@@ -260,7 +262,7 @@ class Traverser {
     void reset(arangodb::velocypack::Slice) override;
 
    private:
-    std::unordered_set<arangodb::velocypack::Slice> _returnedVertices;
+    std::unordered_set<arangodb::velocypack::Slice, arangodb::basics::VelocyPackHelper::VPackStringHash, arangodb::basics::VelocyPackHelper::VPackStringEqual> _returnedVertices;
   };
 
 

@@ -128,8 +128,6 @@ void TraverserExpression::toVelocyPack(VPackBuilder& builder) const {
   builder.close();
 }
 
-
-
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief recursively iterates through the access ast
 ///        Returns false whenever the document does not have the required format
@@ -254,7 +252,7 @@ bool Traverser::VertexGetter::getVertex(
     VPackSlice edge, std::vector<VPackSlice>& result) {
   VPackSlice cmp = result.back();
   VPackSlice res = Transaction::extractFromFromDocument(edge);
-  if (arangodb::basics::VelocyPackHelper::compare(cmp, res, false) == 0) {
+  if (cmp.equals(res)) {
     res = Transaction::extractToFromDocument(edge);
   }
 
@@ -266,19 +264,17 @@ bool Traverser::VertexGetter::getVertex(
 }
 
 bool Traverser::VertexGetter::getSingleVertex(VPackSlice edge,
-                                                          VPackSlice cmp,
-                                                          size_t depth,
-                                                          VPackSlice& result) {
+                                              VPackSlice cmp,
+                                              size_t depth,
+                                              VPackSlice& result) {
   VPackSlice from = Transaction::extractFromFromDocument(edge);
-  if (arangodb::basics::VelocyPackHelper::compare(cmp, from, false) != 0) {
+  if (!from.equals(cmp)) {
     result = from;
   } else {
     result = Transaction::extractToFromDocument(edge);
   }
   return _traverser->vertexMatchesConditions(result, depth);
 }
-
-
 
 void Traverser::VertexGetter::reset(arangodb::velocypack::Slice) {
 }
@@ -288,10 +284,9 @@ bool Traverser::UniqueVertexGetter::getVertex(
   VPackSlice toAdd = Transaction::extractFromFromDocument(edge);
   VPackSlice cmp = result.back();
 
-  if (arangodb::basics::VelocyPackHelper::compare(toAdd, cmp, false) == 0) {
+  if (toAdd.equals(cmp)) {
     toAdd = Transaction::extractToFromDocument(edge);
   }
-  
 
   // First check if we visited it. If not, than mark
   if (_returnedVertices.find(toAdd) != _returnedVertices.end()) {
@@ -314,11 +309,11 @@ bool Traverser::UniqueVertexGetter::getSingleVertex(
   VPackSlice edge, VPackSlice cmp, size_t depth, VPackSlice& result) {
   result = Transaction::extractFromFromDocument(edge);
 
-  if (arangodb::basics::VelocyPackHelper::compare(result, cmp, false) == 0) {
+  if (cmp.equals(result)) {
     result = Transaction::extractToFromDocument(edge);
   }
   
-  // First check if we visited it. If not, than mark
+  // First check if we visited it. If not, then mark
   if (_returnedVertices.find(result) != _returnedVertices.end()) {
     // This vertex is not unique.
     ++_traverser->_filteredPaths;

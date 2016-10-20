@@ -550,7 +550,7 @@ AqlValue Expression::executeSimpleExpressionAttributeAccess(
   AqlValue result = executeSimpleExpression(member, trx, mustDestroy, false);
   AqlValueGuard guard(result, mustDestroy);
 
-  return result.get(trx, name, mustDestroy, true);
+  return result.get(trx, std::string(name, node->getStringLength()), mustDestroy, true);
 }
 
 /// @brief execute an expression of type SIMPLE with INDEXED ACCESS

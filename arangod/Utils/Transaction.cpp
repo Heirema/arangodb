@@ -720,9 +720,7 @@ std::string Transaction::makeIdFromCustom(CollectionNameResolver const* resolver
   TRI_ASSERT(key.isString());
 
   uint64_t cid = DatafileHelper::ReadNumber<uint64_t>(id.begin() + 1, sizeof(uint64_t));
-  // create a buffer big enough for collection name + _key
-  std::string buffer;
-  buffer.reserve(TRI_COL_NAME_LENGTH + TRI_VOC_KEY_MAX_LENGTH + 2);
+  
   std::string resolved = resolver->getCollectionNameCluster(cid);
 #ifdef USE_ENTERPRISE
   if (resolved.compare(0, 7, "_local_") == 0) {
@@ -733,17 +731,15 @@ std::string Transaction::makeIdFromCustom(CollectionNameResolver const* resolver
     resolved.erase(0,4);
   }
 #endif
-  buffer.append(resolved);
-
-  buffer.append("/");
-
   VPackValueLength keyLength;
   char const* p = key.getString(keyLength);
   if (p == nullptr) {
     THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "invalid _key value");
   }
-  buffer.append(p, static_cast<size_t>(keyLength));
-  return buffer;
+  resolved.reserve(resolved.size() + 1 + keyLength);
+  resolved.push_back('/');
+  resolved.append(p, static_cast<size_t>(keyLength));
+  return resolved;
 }
 
 //////////////////////////////////////////////////////////////////////////////

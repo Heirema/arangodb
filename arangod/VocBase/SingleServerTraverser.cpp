@@ -176,7 +176,8 @@ bool SingleServerEdgeCursor::readAll(std::unordered_set<VPackSlice>& result,
 SingleServerTraverser::SingleServerTraverser(TraverserOptions* opts,
                                              arangodb::Transaction* trx,
                                              ManagedDocumentResult* mmdr)
-    : Traverser(opts, trx, mmdr) {}
+    : Traverser(opts, trx, mmdr),
+      _vertices(512, arangodb::basics::VelocyPackHelper::VPackStringHash(), arangodb::basics::VelocyPackHelper::VPackStringEqual()) {}
 
 SingleServerTraverser::~SingleServerTraverser() {}
 
