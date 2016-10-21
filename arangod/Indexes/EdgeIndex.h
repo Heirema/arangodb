@@ -126,7 +126,7 @@ class EdgeIndex final : public Index {
   IndexType type() const override {
     return Index::TRI_IDX_TYPE_EDGE_INDEX;
   }
-  
+
   bool allowExpansion() const override { return false; }
   
   bool canBeDropped() const override { return false; }

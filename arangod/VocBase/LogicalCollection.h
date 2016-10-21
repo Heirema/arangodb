@@ -305,6 +305,7 @@ class LogicalCollection {
   bool tryLockForCompaction() { return getPhysical()->tryLockForCompaction(); }
   void finishCompaction() { getPhysical()->finishCompaction(); }
 
+  void sizeHint(arangodb::Transaction* trx, int64_t hint);
 
   // SECTION: Indexes
 

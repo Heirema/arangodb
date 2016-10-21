@@ -184,12 +184,12 @@ class AssocUnique {
     // entries
     static uint64_t const NotificationSizeThreshold = 131072;
 
-    LOG(TRACE) << "resizing index " << cb << ", target size: " << targetSize;
+    LOG(TRACE) << "resizing hash " << cb << ", target size: " << targetSize;
 
     double start = TRI_microtime();
     if (targetSize > NotificationSizeThreshold) {
       LOG_TOPIC(TRACE, Logger::PERFORMANCE) <<
-          "index-resize " << cb << ", target size: " << targetSize;
+          "hash-resize " << cb << ", target size: " << targetSize;
     }
 
     Element* oldTable = b._table;
@@ -240,9 +240,9 @@ class AssocUnique {
 
     delete[] oldTable;
 
-    LOG(TRACE) << "resizing index " << cb << " done";
+    LOG(TRACE) << "resizing hash " << cb << " done";
 
-    LOG_TOPIC(TRACE, Logger::PERFORMANCE) << "[timer] " << Logger::FIXED(TRI_microtime() - start) << " s, index-resize, " << cb << ", target size: " << targetSize;
+    LOG_TOPIC(TRACE, Logger::PERFORMANCE) << "[timer] " << Logger::FIXED(TRI_microtime() - start) << " s, hash-resize, " << cb << ", target size: " << targetSize;
   }
 
   //////////////////////////////////////////////////////////////////////////////

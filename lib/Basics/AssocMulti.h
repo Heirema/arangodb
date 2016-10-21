@@ -386,40 +386,29 @@ class AssocMulti {
 
     arangodb::Mutex bucketMapLocker;
 
-    std::unordered_map<uint64_t, std::vector<DocumentsPerBucket>> allBuckets;
+    std::vector<std::vector<DocumentsPerBucket>> allBuckets;
+    allBuckets.resize(_bucketsMask + 1); // initialize to number of buckets
 
     // partition the work into some buckets
     {
       std::function<void(size_t, size_t, void*)> partitioner;
       partitioner = [&](size_t lower, size_t upper, void* userData) -> void {
         try {
-          std::unordered_map<uint64_t, DocumentsPerBucket> partitions;
+          std::vector<DocumentsPerBucket> partitions;
+          partitions.resize(_bucketsMask + 1); // initialize to number of buckets
 
           for (size_t i = lower; i < upper; ++i) {
             uint64_t hashByKey = _hashElement(userData, elements[i], true);
             auto bucketId = hashByKey & _bucketsMask;
 
-            auto it = partitions.find(bucketId);
-
-            if (it == partitions.end()) {
-              it = partitions.emplace(bucketId, DocumentsPerBucket()).first;
-            }
-
-            (*it).second.emplace_back(elements[i], hashByKey);
+            partitions[bucketId].emplace_back(elements[i], hashByKey);
           }
 
           // transfer ownership to the central map
           MUTEX_LOCKER(mutexLocker, bucketMapLocker);
 
-          for (auto& it : partitions) {
-            auto it2 = allBuckets.find(it.first);
-
-            if (it2 == allBuckets.end()) {
-              it2 = allBuckets.emplace(it.first,
-                                       std::vector<DocumentsPerBucket>()).first;
-            }
-
-            (*it2).second.emplace_back(std::move(it.second));
+          for (size_t i = 0; i < partitions.size(); ++i) {
+            allBuckets[i].emplace_back(std::move(partitions[i]));
           }
         } catch (...) {
           res = TRI_ERROR_INTERNAL;
@@ -453,6 +442,16 @@ class AssocMulti {
         // must join threads, otherwise the program will crash
         threads[i].join();
       }
+    
+      // sort vectors in vectors so that we have a deterministics insertion order
+      for (size_t i = 0; i < allBuckets.size(); ++i) {
+        std::sort(allBuckets[i].begin(), allBuckets[i].end(), [](DocumentsPerBucket const& lhs, DocumentsPerBucket const& rhs) -> bool {
+          TRI_ASSERT(!lhs.empty());
+          TRI_ASSERT(!rhs.empty());
+
+          return lhs[0].first < rhs[0].first;
+        });
+      }
     }
 
     if (res.load() != TRI_ERROR_NO_ERROR) {
@@ -465,8 +464,8 @@ class AssocMulti {
     {
       auto inserter = [&](size_t chunk, void* userData) -> void {
         try {
-          for (auto const& it : allBuckets) {
-            uint64_t bucketId = it.first;
+          for (size_t i = 0; i < allBuckets.size(); ++i) {
+            uint64_t bucketId = i;
 
             if (bucketId % numThreads != chunk) {
               // we're not responsible for this bucket!
@@ -476,9 +475,9 @@ class AssocMulti {
             // we're responsible for this bucket!
             Bucket& b = _buckets[static_cast<size_t>(bucketId)];
 
-            for (auto const& it2 : it.second) {
-              for (auto const& it3 : it2) {
-                doInsert(userData, it3.first, it3.second, b, true, false);
+            for (auto const& it : allBuckets[i]) {
+              for (auto const& it2 : it) {
+                doInsert(userData, it2.first, it2.second, b, true, false);
               }
             }
           }
@@ -1205,10 +1204,10 @@ class AssocMulti {
   void resizeInternal(UserData* userData, Bucket& b, size_t size) {
     std::string const cb(_contextCallback());
 
-    LOG(TRACE) << "resizing index " << cb << ", target size: " << size;
+    LOG(TRACE) << "resizing hash " << cb << ", target size: " << size;
 
     LOG_TOPIC(TRACE, Logger::PERFORMANCE) <<
-        "index-resize " << cb << ", target size: " << size;
+        "hash-resize " << cb << ", target size: " << size;
 
     double start = TRI_microtime();
 
@@ -1277,9 +1276,9 @@ class AssocMulti {
 
     delete[] oldTable;
 
-    LOG(TRACE) << "resizing index " << cb << " done";
+    LOG(TRACE) << "resizing hash " << cb << " done";
 
-    LOG_TOPIC(TRACE, Logger::PERFORMANCE) << "[timer] " << Logger::FIXED(TRI_microtime() - start) << " s, index-resize, " << cb << ", target size: " << size;
+    LOG_TOPIC(TRACE, Logger::PERFORMANCE) << "[timer] " << Logger::FIXED(TRI_microtime() - start) << " s, hash-resize, " << cb << ", target size: " << size;
   }
 
 #ifdef TRI_CHECK_MULTI_POINTER_HASH

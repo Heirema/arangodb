@@ -513,7 +513,7 @@ HashIndex::HashIndex(TRI_idx_iid_t iid, LogicalCollection* collection,
     auto array = std::make_unique<TRI_HashArray_t>(
         HashKey, *(func.get()), IsEqualKeyElementUnique, IsEqualElementElementUnique,
         *(compare.get()), indexBuckets,
-        []() -> std::string { return "unique hash-array"; });
+        [this]() -> std::string { return this->context(); });
 
     _uniqueArray =
         new HashIndex::UniqueArray(numPaths(), array.get(), func.get(), compare.get());
@@ -524,7 +524,7 @@ HashIndex::HashIndex(TRI_idx_iid_t iid, LogicalCollection* collection,
     auto array = std::make_unique<TRI_HashArrayMulti_t>(
         HashKey, *(func.get()), IsEqualKeyElementMulti, IsEqualElementElementMulti,
         *(compare.get()), indexBuckets, 64,
-        []() -> std::string { return "multi hash-array"; });
+        [this]() -> std::string { return this->context(); });
 
     _multiArray =
         new HashIndex::MultiArray(numPaths(), array.get(), func.get(), compare.get());

@@ -56,7 +56,7 @@ static bool IsEqualElementElement(void*, RevisionCacheEntry const& left,
 } // namespace
 
 CollectionRevisionsCache::CollectionRevisionsCache(LogicalCollection* collection, RevisionCacheChunkAllocator* allocator) 
-    : _revisions(HashKey, HashElement, IsEqualKeyElement, IsEqualElementElement, IsEqualElementElement, 8, []() -> std::string { return "revisions"; }), _collection(collection), _readCache(allocator, this) {}
+    : _revisions(HashKey, HashElement, IsEqualKeyElement, IsEqualElementElement, IsEqualElementElement, 8, [this]() -> std::string { return std::string("revisions for ") + this->_collection->name(); }), _collection(collection), _readCache(allocator, this) {}
 
 CollectionRevisionsCache::~CollectionRevisionsCache() {
   try {
@@ -69,7 +69,7 @@ CollectionRevisionsCache::~CollectionRevisionsCache() {
 std::string CollectionRevisionsCache::name() const {
   return _collection->name();
 }
-
+  
 uint32_t CollectionRevisionsCache::chunkSize() const {
   if (_collection->isSystem()) {
     return 512 * 1024; // use small chunks for system collections
@@ -87,6 +87,12 @@ void CollectionRevisionsCache::clear() {
     _revisions.truncate([](RevisionCacheEntry& entry) { return true; });
   }
   _readCache.clear();
+}
+
+void CollectionRevisionsCache::sizeHint(int64_t hint) {
+  if (hint > 256) {
+    _revisions.resize(nullptr, static_cast<size_t>(hint * 1.1));
+  }
 }
 
 // look up a revision

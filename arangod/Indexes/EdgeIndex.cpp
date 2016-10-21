@@ -64,12 +64,12 @@ static uint64_t HashElementKey(void*, VPackSlice const* key) {
 ////////////////////////////////////////////////////////////////////////////////
 
 static uint64_t HashElementEdge(void*, SimpleIndexElement const& element, bool byKey) {
-  if (!byKey) {
-    TRI_voc_rid_t revisionId = element.revisionId();
-    return fasthash64(&revisionId, sizeof(revisionId), 0x56781234);
+  if (byKey) {
+    return element.hash();
   }
 
-  return element.hash();
+  TRI_voc_rid_t revisionId = element.revisionId();
+  return fasthash64(&revisionId, sizeof(revisionId), 0x56781234);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -108,8 +108,8 @@ static bool IsEqualElementEdgeByKey(void* userData, SimpleIndexElement const& le
     VPackSlice lSlice = left.slice(context);
     VPackSlice rSlice = right.slice(context);
   
-    TRI_ASSERT(rSlice.isString());
     TRI_ASSERT(lSlice.isString());
+    TRI_ASSERT(rSlice.isString());
 
     return lSlice.equals(rSlice);
   } catch (...) {
@@ -129,7 +129,7 @@ EdgeIndexIterator::EdgeIndexIterator(LogicalCollection* collection, arangodb::Tr
       _posInBuffer(0),
       _batchSize(1000),
       _lastElement() {
-        
+  
   keys.release(); // now we have ownership for _keys
 }
 
@@ -589,7 +589,7 @@ int EdgeIndex::sizeHint(arangodb::Transaction* trx, size_t size) {
   // without resizing
   ManagedDocumentResult result(trx); 
   IndexLookupContext context(trx, _collection, &result, 1); 
-  int err = _edgesFrom->resize(&context, static_cast<uint32_t>(size + 2049));
+  int err = _edgesFrom->resize(&context, size + 2049);
 
   if (err != TRI_ERROR_NO_ERROR) {
     return err;
@@ -601,7 +601,7 @@ int EdgeIndex::sizeHint(arangodb::Transaction* trx, size_t size) {
 
   // set an initial size for the index for some new nodes to be created
   // without resizing
-  return _edgesTo->resize(&context, static_cast<uint32_t>(size + 2049));
+  return _edgesTo->resize(&context, size + 2049);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

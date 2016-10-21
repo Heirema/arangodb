@@ -209,7 +209,7 @@ PrimaryIndex::PrimaryIndex(arangodb::LogicalCollection* collection)
   _primaryIndex = new PrimaryIndexImpl(
       HashKey, HashElement, IsEqualKeyElement, IsEqualElementElement,
       IsEqualElementElement, indexBuckets,
-      []() -> std::string { return "primary"; });
+      [this]() -> std::string { return this->context(); });
 }
 
 PrimaryIndex::~PrimaryIndex() { 

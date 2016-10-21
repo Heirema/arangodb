@@ -1334,7 +1334,7 @@ int LogicalCollection::openWorker(bool ignoreErrors) {
   double start = TRI_microtime();
 
   LOG_TOPIC(TRACE, Logger::PERFORMANCE)
-      << "open-collection { collection: " << _vocbase->name() << "/" << name();
+      << "open-collection { collection: " << _vocbase->name() << "/" << name() << " }";
 
   try {
     // check for journals and datafiles
@@ -2570,6 +2570,19 @@ int LogicalCollection::rollbackOperation(arangodb::Transaction* trx,
   return TRI_ERROR_INTERNAL;
 }
 
+void LogicalCollection::sizeHint(Transaction* trx, int64_t hint) {
+  if (hint <= 0) {
+    return;
+  }
+
+  int res = primaryIndex()->resize(trx, static_cast<size_t>(hint * 1.1));
+
+  if (res != TRI_ERROR_NO_ERROR) {
+    return;
+  }
+
+  _revisionsCache->sizeHint(hint);
+}
 
 /// @brief initializes an index with all existing documents
 int LogicalCollection::fillIndex(arangodb::Transaction* trx,
@@ -2637,7 +2650,7 @@ int LogicalCollection::fillIndexBatch(arangodb::Transaction* trx,
   idx->sizeHint(trx, nrUsed);
 
   // process documents a million at a time
-  size_t blockSize = 1024 * 1024;
+  size_t blockSize = 1024 * 1024 * 1;
 
   if (nrUsed < blockSize) {
     blockSize = nrUsed;
@@ -2652,7 +2665,7 @@ int LogicalCollection::fillIndexBatch(arangodb::Transaction* trx,
 
   std::vector<std::pair<TRI_voc_rid_t, VPackSlice>> documents;
   documents.reserve(blockSize);
-
+  
   if (nrUsed > 0) {
     arangodb::basics::BucketPosition position;
     uint64_t total = 0;
@@ -2670,16 +2683,15 @@ int LogicalCollection::fillIndexBatch(arangodb::Transaction* trx,
         uint8_t const* vpack = mmdr.vpack();
         TRI_ASSERT(vpack != nullptr);
         documents.emplace_back(std::make_pair(revisionId, VPackSlice(vpack)));
-        //mmdr->clear();
-      }
+      
+        if (documents.size() == blockSize) {
+          res = idx->batchInsert(trx, documents, indexPool->numThreads());
+          documents.clear();
 
-      if (documents.size() == blockSize) {
-        res = idx->batchInsert(trx, documents, indexPool->numThreads());
-        documents.clear();
-
-        // some error occurred
-        if (res != TRI_ERROR_NO_ERROR) {
-          break;
+          // some error occurred
+          if (res != TRI_ERROR_NO_ERROR) {
+            break;
+          }
         }
       }
     }

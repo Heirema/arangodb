@@ -118,6 +118,10 @@ struct HashIndexElement {
   inline bool operator==(HashIndexElement const& other) const {
     return _revisionId == other._revisionId && _hash == other._hash;
   }
+  
+  inline bool operator<(HashIndexElement const& other) const {
+    return _revisionId < other._revisionId;
+  }
 
   /// @brief base memory usage of an index element
   static constexpr size_t baseMemoryUsage(size_t numSubs) {
@@ -203,7 +207,7 @@ struct SimpleIndexElement {
   constexpr SimpleIndexElement() : _revisionId(0), _hashAndOffset(0) {}
   SimpleIndexElement(TRI_voc_rid_t revisionId, arangodb::velocypack::Slice const& value, uint32_t offset); 
   SimpleIndexElement(SimpleIndexElement const& other) : _revisionId(other._revisionId), _hashAndOffset(other._hashAndOffset) {}
-  SimpleIndexElement& operator=(SimpleIndexElement const& other) {
+  SimpleIndexElement& operator=(SimpleIndexElement const& other) noexcept {
     _revisionId = other._revisionId;
     _hashAndOffset = other._hashAndOffset;
     return *this;
@@ -219,7 +223,10 @@ struct SimpleIndexElement {
   inline bool operator==(SimpleIndexElement const& other) const {
     return _revisionId == other._revisionId && _hashAndOffset == other._hashAndOffset;
   }
-   
+  inline bool operator<(SimpleIndexElement const& other) const {
+    return _revisionId < other._revisionId;
+  }
+  
   static uint64_t hash(arangodb::velocypack::Slice const& value);
   inline void updateRevisionId(TRI_voc_rid_t revisionId, uint32_t offset) { 
     _revisionId = revisionId; 

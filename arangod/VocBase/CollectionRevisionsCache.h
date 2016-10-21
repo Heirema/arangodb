@@ -52,6 +52,8 @@ class CollectionRevisionsCache {
   void closeWriteChunk();
   void clear();
 
+  void sizeHint(int64_t hint);
+
   // look up a revision
   bool lookupRevision(arangodb::Transaction* trx, ManagedDocumentResult& result, TRI_voc_rid_t revisionId, bool shouldLock);
   

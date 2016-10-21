@@ -55,7 +55,7 @@ static bool IsEqualElementElement(void*, MMFilesDocumentPosition const& left,
 } // namespace
 
 MMFilesRevisionsCache::MMFilesRevisionsCache() 
-    : _positions(HashKey, HashElement, IsEqualKeyElement, IsEqualElementElement, IsEqualElementElement, 8, []() -> std::string { return "revisions"; }) {}
+    : _positions(HashKey, HashElement, IsEqualKeyElement, IsEqualElementElement, IsEqualElementElement, 8, []() -> std::string { return "mmfiles revisions"; }) {}
 
 MMFilesRevisionsCache::~MMFilesRevisionsCache() {}
 
@@ -64,6 +64,12 @@ MMFilesDocumentPosition MMFilesRevisionsCache::lookup(TRI_voc_rid_t revisionId) 
   READ_LOCKER(locker, _lock);
 
   return _positions.findByKey(nullptr, &revisionId);
+}
+
+void MMFilesRevisionsCache::sizeHint(int64_t hint) {
+  if (hint > 256) {
+    _positions.resize(nullptr, static_cast<size_t>(hint * 1.1));
+  }
 }
 
 void MMFilesRevisionsCache::clear() {

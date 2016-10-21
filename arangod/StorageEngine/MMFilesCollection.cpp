@@ -309,8 +309,9 @@ int64_t MMFilesCollection::initialCount() const {
 
 void MMFilesCollection::updateCount(int64_t count) {
   _initialCount = count;
+  _revisionsCache.sizeHint(count);
 }
-
+  
 /// @brief closes an open collection
 int MMFilesCollection::close() {
   {
@@ -1069,15 +1070,7 @@ int MMFilesCollection::iterateMarkersOnLoad(arangodb::Transaction* trx) {
   OpenIteratorState openState(_logicalCollection, trx);
 
   if (_initialCount != -1) {
-    auto primaryIndex = _logicalCollection->primaryIndex();
-
-    int res = primaryIndex->resize(
-        trx, static_cast<size_t>(_initialCount * 1.1));
-
-    if (res != TRI_ERROR_NO_ERROR) {
-      return res;
-    }
-
+    _logicalCollection->sizeHint(trx, _initialCount);
     openState._initialCount = _initialCount;
   }
 
