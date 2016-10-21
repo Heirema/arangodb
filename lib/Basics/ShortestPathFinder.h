@@ -1155,9 +1155,9 @@ class ConstDistanceFinder : public PathFinder<VertexId, Path> {
           size_t const neighborsSize = neighbors.size();
           TRI_ASSERT(edges.size() == neighborsSize);
           for (size_t i = 0; i < neighborsSize; ++i) {
-            VertexId const n = neighbors.at(i);
+            VertexId const& n = neighbors[i];
             if (_leftFound.find(n) == _leftFound.end()) {
-              auto leftFoundIt = _leftFound.emplace(n, new PathSnippet(v, edges.at(i))).first;
+              auto leftFoundIt = _leftFound.emplace(n, new PathSnippet(v, edges[i])).first;
               auto rightFoundIt = _rightFound.find(n);
               if (rightFoundIt != _rightFound.end()) {
                 result._vertices.emplace_back(n);
@@ -1194,9 +1194,9 @@ class ConstDistanceFinder : public PathFinder<VertexId, Path> {
           size_t const neighborsSize = neighbors.size();
           TRI_ASSERT(edges.size() == neighborsSize);
           for (size_t i = 0; i < neighborsSize; ++i) {
-            VertexId const n = neighbors.at(i);
+            VertexId const& n = neighbors[i];
             if (_rightFound.find(n) == _rightFound.end()) {
-              auto rightFoundIt = _rightFound.emplace(n, new PathSnippet(v, edges.at(i))).first;
+              auto rightFoundIt = _rightFound.emplace(n, new PathSnippet(v, edges[i])).first;
               auto leftFoundIt = _leftFound.find(n);
               if (leftFoundIt != _leftFound.end()) {
                 result._vertices.emplace_back(n);
