@@ -249,12 +249,12 @@ void Scheduler::startNewThread() {
 }
 
 bool Scheduler::stopThread() {
+  if (_nrRunning <= _nrMinimal) {
+    return false;
+  }
+  
   if (_nrRunning >= 3) {
-    int64_t low = _nrMinimal;
-
-    if (low == 0) {
-      low = ((_nrRunning <= 4) ? 0 : (_nrRunning * 1 / 4)) - _nrBlocked;
-    }
+    int64_t low = ((_nrRunning <= 4) ? 0 : (_nrRunning * 1 / 4)) - _nrBlocked;
 
     if (_nrBusy <= low && _nrWorking <= low) {
       return true;
@@ -312,7 +312,7 @@ void Scheduler::rebalanceThreads() {
     }
   }
 
-  if (working >= _nrMaximal + _nrBlocked) {
+  if (working >= _nrMaximal + _nrBlocked || _nrRunning < _nrMinimal) {
     double ltw = _lastThreadWarning.load();
     double now = TRI_microtime();
 
