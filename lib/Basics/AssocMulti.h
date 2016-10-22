@@ -446,8 +446,15 @@ class AssocMulti {
       // sort vectors in vectors so that we have a deterministics insertion order
       for (size_t i = 0; i < allBuckets.size(); ++i) {
         std::sort(allBuckets[i].begin(), allBuckets[i].end(), [](DocumentsPerBucket const& lhs, DocumentsPerBucket const& rhs) -> bool {
-          TRI_ASSERT(!lhs.empty());
-          TRI_ASSERT(!rhs.empty());
+          if (lhs.empty() && rhs.empty()) {
+            return false;
+          }
+          if (lhs.empty() && !rhs.empty()) {
+            return true;
+          }
+          if (rhs.empty() && !lhs.empty()) {
+            return false;
+          }
 
           return lhs[0].first < rhs[0].first;
         });
