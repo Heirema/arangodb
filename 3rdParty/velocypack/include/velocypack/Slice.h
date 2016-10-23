@@ -127,7 +127,7 @@ class Slice {
 
   // creates a Slice from a pointer to a char array
   explicit constexpr Slice(char const* start) noexcept
-      : _start(reinterpret_cast<uint8_t const*>(start)) {}
+    : _start((uint8_t const*)(start)) {} // reinterpret_cast does not work C++ 11 5.19.2
   
   // creates a Slice from Json and adds it to a scope
   static Slice fromJson(SliceScope& scope, std::string const& json,
