@@ -2025,7 +2025,7 @@ int modifyDocumentOnCoordinator(
         requests.emplace_back(
             "shard:" + it.first, reqType,
             baseUrl + StringUtils::urlEncode(it.first) + "/" +
-                slice.get(StaticStrings::KeyString).copyString() + optsUrlPart,
+                StringUtils::urlEncode(slice.get(StaticStrings::KeyString).copyString()) + optsUrlPart,
             body);
       } else {
         reqBuilder.clear();
