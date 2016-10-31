@@ -179,9 +179,9 @@ bool RestEdgesHandler::getEdgesForVertex(
 // read in- or outbound edges
 bool RestEdgesHandler::readEdges(
     std::vector<traverser::TraverserExpression*> const& expressions) {
-  std::vector<std::string> const& suffix = _request->suffix();
+  std::vector<std::string> const& suffixes = _request->decodedSuffixes();
 
-  if (suffix.size() != 1) {
+  if (suffixes.size() != 1) {
     generateError(rest::ResponseCode::BAD,
                   TRI_ERROR_HTTP_BAD_PARAMETER,
                   "expected GET " + EDGES_PATH +
@@ -190,7 +190,7 @@ bool RestEdgesHandler::readEdges(
     return false;
   }
 
-  std::string collectionName = suffix[0];
+  std::string collectionName = suffixes[0];
   CollectionNameResolver resolver(_vocbase);
   TRI_col_type_e colType = resolver.getCollectionTypeCluster(collectionName);
   if (colType == TRI_COL_TYPE_UNKNOWN) {
@@ -324,9 +324,9 @@ bool RestEdgesHandler::readEdges(
 // Not publicly documented on purpose.
 // NOTE: It ONLY except _id strings. Nothing else
 bool RestEdgesHandler::readEdgesForMultipleVertices() {
-  std::vector<std::string> const& suffix = _request->suffix();
+  std::vector<std::string> const& suffixes = _request->decodedSuffixes();
 
-  if (suffix.size() != 1) {
+  if (suffixes.size() != 1) {
     generateError(rest::ResponseCode::BAD,
                   TRI_ERROR_HTTP_BAD_PARAMETER,
                   "expected POST " + EDGES_PATH +
@@ -355,7 +355,7 @@ bool RestEdgesHandler::readEdgesForMultipleVertices() {
     return false;
   }
 
-  std::string collectionName = suffix[0];
+  std::string collectionName = suffixes[0];
   CollectionNameResolver resolver(_vocbase);
   TRI_col_type_e colType = resolver.getCollectionTypeCluster(collectionName);
 
